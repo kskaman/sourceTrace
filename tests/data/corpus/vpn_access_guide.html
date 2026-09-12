@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="VPN Access Guide">
+  <meta name="category" content="IT">
+  <meta name="doc_type" content="guide">
+  <meta name="last_updated" content="2024-04-01">
+  <meta name="owner" content="IT Operations">
+  <meta name="classification" content="Internal">
+  <title>VPN Access Guide</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 1.5em; color: #1a1a1a; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+    code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.95em; }
+    ol li { margin-bottom: 0.5em; }
+  </style>
+</head>
+<body>
+
+<h1>VPN Access Guide</h1>
+
+<p><strong>Last Updated:</strong> April 1, 2024<br>
+<strong>Applies to:</strong> All Acme Corp employees and authorized contractors working remotely</p>
+
+<section>
+  <h2>1. Overview</h2>
+  <p>All remote access to Acme Corp internal systems requires the company VPN. The VPN encrypts your connection and enforces security checks (MFA, device posture) before granting access to internal resources.</p>
+</section>
+
+<section>
+  <h2>2. Supported Clients</h2>
+  <table>
+    <tr><th>Operating System</th><th>Client</th><th>Version</th></tr>
+    <tr><td>macOS</td><td>Cloudflare WARP</td><td>2024.1 or later</td></tr>
+    <tr><td>Windows 10/11</td><td>Cloudflare WARP</td><td>2024.1 or later</td></tr>
+    <tr><td>Linux (Ubuntu 22.04+, Fedora 38+)</td><td>Cloudflare WARP CLI</td><td>2024.1 or later</td></tr>
+    <tr><td>iOS</td><td>Cloudflare 1.1.1.1 app</td><td>Latest from App Store</td></tr>
+    <tr><td>Android</td><td>Cloudflare 1.1.1.1 app</td><td>Latest from Play Store</td></tr>
+  </table>
+  <p>Third-party VPN clients are not supported. Do not use personal VPN services concurrently with the Acme Corp VPN.</p>
+</section>
+
+<section>
+  <h2>3. Enrollment Steps</h2>
+  <ol>
+    <li>Open your web browser and navigate to <code>vpn.acmecorp.com/enroll</code>.</li>
+    <li>Sign in with your Acme Corp SSO credentials (your @acmecorp.com email and password).</li>
+    <li>Complete the MFA challenge (hardware key or authenticator app).</li>
+    <li>Download and install the VPN client for your operating system from the enrollment page.</li>
+    <li>Open the VPN client and sign in when prompted. The client will register your device automatically.</li>
+    <li>The client performs a device posture check: OS version, disk encryption status, and endpoint agent. If any check fails, you will see a specific error message with remediation steps.</li>
+    <li>Once all checks pass, the VPN connects. A shield icon in your system tray confirms an active connection.</li>
+  </ol>
+</section>
+
+<section>
+  <h2>4. Daily Use</h2>
+  <p>The VPN client runs automatically at startup and connects when it detects you are outside the corporate network. You do not need to manually connect each day.</p>
+  <p>To verify your connection status, click the VPN icon in your system tray. A green shield means connected; a gray shield means disconnected.</p>
+  <p>Split tunneling is disabled for connections to production and management zones. Personal internet traffic (streaming, personal email) routes outside the VPN tunnel when accessing non-corporate destinations.</p>
+</section>
+
+<section>
+  <h2>5. Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>Likely Cause</th><th>Fix</th></tr>
+    <tr><td>Client shows "Device posture check failed"</td><td>Disk encryption disabled or endpoint agent not running</td><td>Enable FileVault/BitLocker and ensure the EDR agent is active. Restart the client.</td></tr>
+    <tr><td>Client shows "Authentication failed"</td><td>Expired password or MFA timeout</td><td>Reset your password via the self-service portal. Re-enroll MFA if needed.</td></tr>
+    <tr><td>Connected but cannot reach internal sites</td><td>DNS resolution issue</td><td>Disconnect and reconnect. If the issue persists, run <code>warp-cli diagnostics</code> and send the output to IT.</td></tr>
+    <tr><td>Slow connection speeds</td><td>ISP throttling or poor Wi-Fi signal</td><td>Try a wired connection. If still slow, contact IT to check the nearest VPN edge node.</td></tr>
+    <tr><td>Client crashes on startup</td><td>Outdated client version</td><td>Uninstall and reinstall from <code>vpn.acmecorp.com/enroll</code>.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>6. Support</h2>
+  <p>For VPN issues not resolved by the troubleshooting steps above, contact IT at <a href="mailto:it-support@acmecorp.com">it-support@acmecorp.com</a> or Slack <code>#it-help</code>.</p>
+</section>
+
+</body>
+</html>

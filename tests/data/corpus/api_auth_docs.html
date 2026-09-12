@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="API Authentication Documentation">
+  <meta name="category" content="Product">
+  <meta name="doc_type" content="guide">
+  <meta name="last_updated" content="2025-01-15">
+  <meta name="owner" content="Engineering">
+  <meta name="classification" content="Public">
+  <title>API Authentication — Acme Corp Developer Docs</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 2em; color: #1a1a1a; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    h3 { margin-top: 1.2em; color: #333; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+    code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.95em; }
+    pre { background-color: #f0f0f0; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 0.9em; }
+    ul li, ol li { margin-bottom: 0.4em; }
+    .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 1em 0; }
+    .info { background-color: #eef6ff; border-left: 4px solid #3b82f6; padding: 12px; margin: 1em 0; }
+  </style>
+</head>
+<body>
+
+<h1>API Authentication</h1>
+<p><strong>Base URL:</strong> <code>https://api.acmecorp.com/v2</code><br>
+<strong>Last Updated:</strong> January 15, 2025</p>
+
+<p>All requests to the Acme Corp API must be authenticated. This guide covers the two supported authentication methods: API keys and OAuth 2.0.</p>
+
+<section>
+  <h2>1. API Key Authentication</h2>
+
+  <h3>1.1 Generating an API Key</h3>
+  <p>Account administrators can generate API keys in the Acme Corp dashboard:</p>
+  <ol>
+    <li>Navigate to <strong>Settings &gt; API &gt; Keys</strong>.</li>
+    <li>Click <strong>Generate New Key</strong>.</li>
+    <li>Assign a descriptive name (e.g., "Production Backend", "CI/CD Pipeline").</li>
+    <li>Select the permission scope (read-only, read-write, or admin).</li>
+    <li>Copy the key immediately — it is displayed only once.</li>
+  </ol>
+  <div class="warning">
+    <strong>Security:</strong> API keys are displayed only at the time of creation. Store them in a secrets manager (e.g., HashiCorp Vault, AWS Secrets Manager). Do not commit API keys to source code, store them in environment variables on shared systems, or send them via email or chat.
+  </div>
+
+  <h3>1.2 Using an API Key</h3>
+  <p>Include the API key in the <code>Authorization</code> header of every request:</p>
+  <pre>GET /v2/data/records HTTP/1.1
+Host: api.acmecorp.com
+Authorization: Bearer acme_sk_live_7f3a9b2c...</pre>
+  <p>API keys use the prefix <code>acme_sk_live_</code> for production keys and <code>acme_sk_test_</code> for sandbox keys. Do not use test keys against the production API or vice versa.</p>
+
+  <h3>1.3 Key Rotation</h3>
+  <p>API keys should be rotated regularly to reduce the risk of credential compromise. Acme Corp recommends rotating keys every 180 days.</p>
+  <p>To rotate a key without downtime:</p>
+  <ol>
+    <li>Generate a new key in the dashboard.</li>
+    <li>Update your application to use the new key.</li>
+    <li>Verify that requests succeed with the new key.</li>
+    <li>Revoke the old key in the dashboard.</li>
+  </ol>
+  <p>Both the old and new keys are active simultaneously until the old key is explicitly revoked, giving you time to deploy the change.</p>
+
+  <h3>1.4 Key Permissions</h3>
+  <table>
+    <tr><th>Scope</th><th>Allowed Operations</th></tr>
+    <tr><td><code>read</code></td><td>GET requests only. Cannot create, update, or delete resources.</td></tr>
+    <tr><td><code>read-write</code></td><td>GET, POST, PUT, PATCH, DELETE on resources owned by the account.</td></tr>
+    <tr><td><code>admin</code></td><td>All operations, including user management, billing, and API key management.</td></tr>
+  </table>
+  <p>Follow the principle of least privilege: grant each key only the permissions it needs. CI/CD pipelines typically need <code>read-write</code>; monitoring tools typically need <code>read</code>.</p>
+</section>
+
+<section>
+  <h2>2. OAuth 2.0 Authentication</h2>
+  <p>OAuth 2.0 is the recommended authentication method for applications that act on behalf of a user (e.g., third-party integrations, partner apps). Acme Corp supports two OAuth 2.0 flows:</p>
+
+  <h3>2.1 Authorization Code Flow (Recommended)</h3>
+  <p>Use the Authorization Code flow for server-side applications that can securely store a client secret.</p>
+  <ol>
+    <li>
+      <strong>Redirect the user to the authorization endpoint:</strong>
+      <pre>GET https://auth.acmecorp.com/oauth/authorize?
+  response_type=code&amp;
+  client_id=YOUR_CLIENT_ID&amp;
+  redirect_uri=https://yourapp.com/callback&amp;
+  scope=read+write&amp;
+  state=random_csrf_token</pre>
+    </li>
+    <li><strong>User authenticates</strong> with their Acme Corp credentials and approves the requested scopes.</li>
+    <li>
+      <strong>Acme Corp redirects back</strong> to your <code>redirect_uri</code> with an authorization code:
+      <pre>https://yourapp.com/callback?code=AUTH_CODE&amp;state=random_csrf_token</pre>
+    </li>
+    <li>
+      <strong>Exchange the code for tokens:</strong>
+      <pre>POST https://auth.acmecorp.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&amp;
+code=AUTH_CODE&amp;
+client_id=YOUR_CLIENT_ID&amp;
+client_secret=YOUR_CLIENT_SECRET&amp;
+redirect_uri=https://yourapp.com/callback</pre>
+    </li>
+    <li>
+      <strong>Receive the token response:</strong>
+      <pre>{
+  "access_token": "acme_at_8f2b...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "acme_rt_4c7d...",
+  "scope": "read write"
+}</pre>
+    </li>
+  </ol>
+
+  <h3>2.2 Client Credentials Flow</h3>
+  <p>Use the Client Credentials flow for machine-to-machine communication where no user context is needed (e.g., backend service calling the Acme Corp API).</p>
+  <pre>POST https://auth.acmecorp.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&amp;
+client_id=YOUR_CLIENT_ID&amp;
+client_secret=YOUR_CLIENT_SECRET&amp;
+scope=read</pre>
+  <p>The response contains an access token but no refresh token. Request a new token when the current one expires.</p>
+
+  <h3>2.3 Token Lifetimes</h3>
+  <table>
+    <tr><th>Token Type</th><th>Lifetime</th><th>Renewable</th></tr>
+    <tr><td>Access token</td><td>1 hour</td><td>No (request a new one using the refresh token)</td></tr>
+    <tr><td>Refresh token</td><td>30 days</td><td>Yes (each use issues a new refresh token)</td></tr>
+    <tr><td>Authorization code</td><td>10 minutes</td><td>No (single use)</td></tr>
+  </table>
+
+  <h3>2.4 Refreshing Tokens</h3>
+  <pre>POST https://auth.acmecorp.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&amp;
+refresh_token=acme_rt_4c7d...&amp;
+client_id=YOUR_CLIENT_ID&amp;
+client_secret=YOUR_CLIENT_SECRET</pre>
+  <p>Each refresh request returns a new access token and a new refresh token. The previous refresh token is invalidated (rotation). If a refresh token is used more than once, all tokens in the chain are revoked as a security precaution.</p>
+
+  <h3>2.5 Scopes</h3>
+  <table>
+    <tr><th>Scope</th><th>Description</th></tr>
+    <tr><td><code>read</code></td><td>Read access to the user's resources</td></tr>
+    <tr><td><code>write</code></td><td>Create and update resources</td></tr>
+    <tr><td><code>delete</code></td><td>Delete resources</td></tr>
+    <tr><td><code>admin</code></td><td>Account administration (user management, billing)</td></tr>
+    <tr><td><code>offline_access</code></td><td>Request a refresh token for long-lived access</td></tr>
+  </table>
+  <p>Request only the scopes your application needs. Users see the requested scopes during the authorization step and may decline if the request seems excessive.</p>
+</section>
+
+<section>
+  <h2>3. What Happens When Authentication Fails</h2>
+  <p>When a system fails to authenticate against the Acme Corp API, the server returns an HTTP error response with a JSON body describing the failure. The response depends on the type of authentication failure:</p>
+
+  <h3>3.1 Error Responses</h3>
+  <table>
+    <tr><th>HTTP Status</th><th>Error Code</th><th>Description</th><th>Common Cause</th></tr>
+    <tr><td>401 Unauthorized</td><td><code>invalid_api_key</code></td><td>The API key is missing, malformed, or has been revoked.</td><td>Key was revoked or rotated; application is still using the old key.</td></tr>
+    <tr><td>401 Unauthorized</td><td><code>expired_token</code></td><td>The OAuth access token has expired.</td><td>Token lifetime (1 hour) exceeded; application did not refresh.</td></tr>
+    <tr><td>401 Unauthorized</td><td><code>invalid_token</code></td><td>The OAuth token is malformed or has been revoked.</td><td>Token was part of a revoked refresh chain; client stored a corrupted token.</td></tr>
+    <tr><td>403 Forbidden</td><td><code>insufficient_scope</code></td><td>The authenticated token does not have the required scope for this endpoint.</td><td>Token was issued with <code>read</code> scope but the request requires <code>write</code>.</td></tr>
+    <tr><td>403 Forbidden</td><td><code>ip_not_allowed</code></td><td>The request originates from an IP address not in the key's allowlist.</td><td>IP allowlist configured on the key does not include the requesting server.</td></tr>
+    <tr><td>429 Too Many Requests</td><td><code>rate_limited</code></td><td>The API key or token has exceeded the rate limit.</td><td>Too many requests in the time window. Check the <code>Retry-After</code> header.</td></tr>
+  </table>
+
+  <h3>3.2 Example Error Response</h3>
+  <pre>{
+  "error": "invalid_api_key",
+  "error_description": "The API key provided is not valid. It may have been revoked or rotated.",
+  "status": 401,
+  "documentation_url": "https://docs.acmecorp.com/api/auth#errors"
+}</pre>
+
+  <h3>3.3 Handling Authentication Failures</h3>
+  <p>Your application should handle authentication failures as follows:</p>
+  <ul>
+    <li><strong>401 with <code>expired_token</code>:</strong> Attempt to refresh the token using the refresh token. If the refresh fails, redirect the user to re-authenticate.</li>
+    <li><strong>401 with <code>invalid_api_key</code>:</strong> Check that the key has not been revoked. Generate a new key if necessary. Do not retry with the same key.</li>
+    <li><strong>403 with <code>insufficient_scope</code>:</strong> Request a new token with the required scopes. This may require user re-authorization.</li>
+    <li><strong>429 <code>rate_limited</code>:</strong> Wait for the duration specified in the <code>Retry-After</code> response header before retrying. Implement exponential backoff for repeated 429 responses.</li>
+  </ul>
+  <div class="info">
+    <strong>Tip:</strong> Log all authentication errors with the <code>x-request-id</code> response header value. When contacting support, include this ID so we can trace the request through our systems.
+  </div>
+</section>
+
+<section>
+  <h2>4. Security Best Practices</h2>
+  <ul>
+    <li>Store API keys and client secrets in a secrets manager, never in source code or configuration files.</li>
+    <li>Rotate API keys every 180 days.</li>
+    <li>Use IP allowlists to restrict where API keys can be used from.</li>
+    <li>Use the Authorization Code flow (not Client Credentials) when acting on behalf of a user, to ensure proper consent and scope.</li>
+    <li>Request the minimum necessary scopes for each integration.</li>
+    <li>Monitor API key usage in the dashboard under <strong>Settings &gt; API &gt; Usage</strong>. Set up alerts for unusual patterns (unexpected IP addresses, spike in 401 errors).</li>
+    <li>Revoke keys and tokens immediately if you suspect a compromise.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>5. Rate Limits</h2>
+  <p>API rate limits are applied per API key or OAuth token:</p>
+  <table>
+    <tr><th>Plan</th><th>Requests per Minute</th><th>Concurrent Connections</th></tr>
+    <tr><td>Starter</td><td>60</td><td>5</td></tr>
+    <tr><td>Pro</td><td>300</td><td>20</td></tr>
+    <tr><td>Enterprise</td><td>1,000+</td><td>Custom</td></tr>
+  </table>
+  <p>Rate limit status is returned in response headers: <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, and <code>X-RateLimit-Reset</code> (Unix timestamp).</p>
+</section>
+
+<section>
+  <h2>6. Support</h2>
+  <p>For authentication issues, contact <a href="mailto:api-support@acmecorp.com">api-support@acmecorp.com</a> or visit <a href="https://docs.acmecorp.com/api">docs.acmecorp.com/api</a>.</p>
+</section>
+
+</body>
+</html>

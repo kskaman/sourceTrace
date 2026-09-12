@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="Acme Corp REST API Reference">
+  <meta name="category" content="Product">
+  <meta name="doc_type" content="reference">
+  <meta name="last_updated" content="2025-01-15">
+  <meta name="owner" content="Engineering">
+  <meta name="classification" content="Public">
+  <title>Acme Corp REST API Reference</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 2em; color: #1a1a1a; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    h3 { margin-top: 1.5em; color: #333; }
+    h4 { margin-top: 1em; color: #555; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+    code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.95em; }
+    pre { background-color: #f0f0f0; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 0.9em; }
+    .method-get { color: #22863a; font-weight: bold; }
+    .method-post { color: #6f42c1; font-weight: bold; }
+    .method-put { color: #005cc5; font-weight: bold; }
+    .method-patch { color: #e36209; font-weight: bold; }
+    .method-delete { color: #cb2431; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h1>Acme Corp REST API Reference</h1>
+<p><strong>API Version:</strong> v2<br>
+<strong>Base URL:</strong> <code>https://api.acmecorp.com/v2</code><br>
+<strong>Last Updated:</strong> January 15, 2025</p>
+
+<p>This reference documents all available endpoints in the Acme Corp REST API. All requests must be authenticated using an API key or OAuth 2.0 token. See the <a href="api_auth_docs.html">API Authentication</a> documentation for details.</p>
+
+<section>
+  <h2>1. Overview</h2>
+
+  <section>
+    <h3>1.1 Base URL and Versioning</h3>
+    <p>All API endpoints are served from <code>https://api.acmecorp.com/v2</code>. The version is included in the URL path. When a new major version is released, the previous version remains available for at least 12 months after the deprecation announcement.</p>
+    <p>The current version (v2) was released in March 2024. The deprecated v1 API remains accessible until March 2025.</p>
+  </section>
+
+  <section>
+    <h3>1.2 Request Format</h3>
+    <p>All request bodies must be JSON-encoded with the <code>Content-Type: application/json</code> header. Query parameters are used for filtering, sorting, and pagination. Path parameters identify specific resources.</p>
+  </section>
+
+  <section>
+    <h3>1.3 Response Format</h3>
+    <p>All responses are JSON-encoded. Successful responses return a <code>data</code> field containing the result. Error responses return an <code>error</code> field with a machine-readable code and a human-readable description.</p>
+    <pre>{
+  "data": { ... },
+  "meta": {
+    "request_id": "req_8f2b4a...",
+    "timestamp": "2025-01-15T10:30:00Z"
+  }
+}</pre>
+    <p>Every response includes a unique <code>request_id</code> in the <code>meta</code> object and in the <code>X-Request-ID</code> response header. Include this ID when contacting support.</p>
+  </section>
+</section>
+
+<section>
+  <h2>2. Authentication</h2>
+  <p>See <a href="api_auth_docs.html">API Authentication</a> for full details. In summary:</p>
+  <ul>
+    <li><strong>API key:</strong> Pass in the <code>Authorization: Bearer acme_sk_live_...</code> header.</li>
+    <li><strong>OAuth 2.0:</strong> Pass the access token in the <code>Authorization: Bearer acme_at_...</code> header.</li>
+  </ul>
+  <p>Unauthenticated requests receive a <code>401 Unauthorized</code> response.</p>
+</section>
+
+<section>
+  <h2>3. Pagination</h2>
+
+  <section>
+    <h3>3.1 Cursor-Based Pagination</h3>
+    <p>List endpoints return paginated results using cursor-based pagination. Each response includes a <code>pagination</code> object:</p>
+    <pre>{
+  "data": [ ... ],
+  "pagination": {
+    "has_more": true,
+    "next_cursor": "eyJpZCI6MTAwfQ==",
+    "previous_cursor": null
+  }
+}</pre>
+    <p>To fetch the next page, pass the <code>next_cursor</code> value as the <code>cursor</code> query parameter:</p>
+    <pre>GET /v2/records?cursor=eyJpZCI6MTAwfQ==&amp;limit=50</pre>
+  </section>
+
+  <section>
+    <h3>3.2 Page Size</h3>
+    <p>Use the <code>limit</code> query parameter to control the number of results per page:</p>
+    <table>
+      <tr><th>Parameter</th><th>Default</th><th>Minimum</th><th>Maximum</th></tr>
+      <tr><td><code>limit</code></td><td>25</td><td>1</td><td>100</td></tr>
+    </table>
+    <p>Requesting a <code>limit</code> above 100 returns a <code>400 Bad Request</code> error.</p>
+  </section>
+
+  <section>
+    <h3>3.3 Total Count</h3>
+    <p>List endpoints include a <code>total_count</code> field in the response when the <code>include_count=true</code> query parameter is passed. Counting adds latency for large collections; omit it when not needed.</p>
+  </section>
+</section>
+
+<section>
+  <h2>4. Rate Limits</h2>
+
+  <section>
+    <h3>4.1 Limits by Plan</h3>
+    <table>
+      <tr><th>Plan</th><th>Requests per Minute</th><th>Requests per Day</th><th>Concurrent Connections</th></tr>
+      <tr><td>Starter</td><td>60</td><td>10,000</td><td>5</td></tr>
+      <tr><td>Pro</td><td>300</td><td>100,000</td><td>20</td></tr>
+      <tr><td>Enterprise</td><td>1,000+</td><td>Custom</td><td>Custom</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h3>4.2 Rate Limit Headers</h3>
+    <p>Every response includes rate limit information in headers:</p>
+    <table>
+      <tr><th>Header</th><th>Description</th></tr>
+      <tr><td><code>X-RateLimit-Limit</code></td><td>Maximum requests per minute for the current key/token</td></tr>
+      <tr><td><code>X-RateLimit-Remaining</code></td><td>Requests remaining in the current window</td></tr>
+      <tr><td><code>X-RateLimit-Reset</code></td><td>Unix timestamp when the window resets</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h3>4.3 Handling 429 Responses</h3>
+    <p>When the rate limit is exceeded, the API returns <code>429 Too Many Requests</code> with a <code>Retry-After</code> header (in seconds). Implement exponential backoff: wait the <code>Retry-After</code> duration, then double the wait on each consecutive 429 until the request succeeds.</p>
+  </section>
+</section>
+
+<section>
+  <h2>5. Records API</h2>
+
+  <section>
+    <h3>5.1 List Records</h3>
+    <p><span class="method-get">GET</span> <code>/v2/records</code></p>
+    <p>Returns a paginated list of records in the authenticated account.</p>
+    <h4>Query Parameters</h4>
+    <table>
+      <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>limit</code></td><td>integer</td><td>No</td><td>Results per page (default 25, max 100)</td></tr>
+      <tr><td><code>cursor</code></td><td>string</td><td>No</td><td>Pagination cursor from a previous response</td></tr>
+      <tr><td><code>sort</code></td><td>string</td><td>No</td><td>Sort field: <code>created_at</code>, <code>updated_at</code>, <code>name</code> (default: <code>created_at</code>)</td></tr>
+      <tr><td><code>order</code></td><td>string</td><td>No</td><td><code>asc</code> or <code>desc</code> (default: <code>desc</code>)</td></tr>
+      <tr><td><code>status</code></td><td>string</td><td>No</td><td>Filter by status: <code>active</code>, <code>archived</code>, <code>deleted</code></td></tr>
+      <tr><td><code>created_after</code></td><td>ISO 8601</td><td>No</td><td>Filter records created after this timestamp</td></tr>
+      <tr><td><code>created_before</code></td><td>ISO 8601</td><td>No</td><td>Filter records created before this timestamp</td></tr>
+      <tr><td><code>q</code></td><td>string</td><td>No</td><td>Full-text search across record name and content</td></tr>
+    </table>
+    <h4>Example Response</h4>
+    <pre>{
+  "data": [
+    {
+      "id": "rec_a1b2c3",
+      "name": "Q3 2025 Revenue Summary",
+      "status": "active",
+      "created_at": "2025-01-10T14:30:00Z",
+      "updated_at": "2025-01-12T09:15:00Z",
+      "created_by": "user_x7y8z9",
+      "tags": ["finance", "quarterly"]
+    }
+  ],
+  "pagination": {
+    "has_more": true,
+    "next_cursor": "eyJpZCI6MTAxfQ==",
+    "previous_cursor": null
+  },
+  "meta": {
+    "request_id": "req_f3d2a1...",
+    "timestamp": "2025-01-15T10:30:00Z"
+  }
+}</pre>
+  </section>
+
+  <section>
+    <h3>5.2 Get a Record</h3>
+    <p><span class="method-get">GET</span> <code>/v2/records/{record_id}</code></p>
+    <p>Returns a single record by ID, including its full content.</p>
+    <h4>Path Parameters</h4>
+    <table>
+      <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>record_id</code></td><td>string</td><td>The record's unique identifier (e.g., <code>rec_a1b2c3</code>)</td></tr>
+    </table>
+    <h4>Response</h4>
+    <p>Returns the full record object including <code>content</code> (the record body), <code>metadata</code>, and <code>attachments</code> array.</p>
+    <p>Returns <code>404 Not Found</code> if the record does not exist or the authenticated user does not have access.</p>
+  </section>
+
+  <section>
+    <h3>5.3 Create a Record</h3>
+    <p><span class="method-post">POST</span> <code>/v2/records</code></p>
+    <p>Creates a new record. Requires <code>write</code> scope.</p>
+    <h4>Request Body</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>name</code></td><td>string</td><td>Yes</td><td>Record name (max 255 characters)</td></tr>
+      <tr><td><code>content</code></td><td>string</td><td>Yes</td><td>Record body (max 1 MB)</td></tr>
+      <tr><td><code>tags</code></td><td>array of strings</td><td>No</td><td>Tags for categorization (max 20 tags, max 50 chars each)</td></tr>
+      <tr><td><code>metadata</code></td><td>object</td><td>No</td><td>Arbitrary key-value pairs (max 50 keys, max 500 chars per value)</td></tr>
+    </table>
+    <h4>Example Request</h4>
+    <pre>POST /v2/records HTTP/1.1
+Host: api.acmecorp.com
+Authorization: Bearer acme_sk_live_7f3a...
+Content-Type: application/json
+
+{
+  "name": "Meeting Notes — Product Review",
+  "content": "Discussed roadmap priorities for Q2...",
+  "tags": ["meetings", "product"],
+  "metadata": {
+    "department": "Product",
+    "meeting_date": "2025-01-14"
+  }
+}</pre>
+    <p>Returns <code>201 Created</code> with the full record object. Returns <code>422 Unprocessable Entity</code> if required fields are missing or validation fails.</p>
+  </section>
+
+  <section>
+    <h3>5.4 Update a Record</h3>
+    <p><span class="method-patch">PATCH</span> <code>/v2/records/{record_id}</code></p>
+    <p>Updates specific fields of an existing record. Only include fields you want to change. Requires <code>write</code> scope.</p>
+    <h4>Request Body</h4>
+    <p>Same fields as Create, all optional. Omitted fields are left unchanged. To clear a field, pass <code>null</code>.</p>
+    <p>Returns <code>200 OK</code> with the updated record. Returns <code>404 Not Found</code> or <code>422 Unprocessable Entity</code> as appropriate.</p>
+  </section>
+
+  <section>
+    <h3>5.5 Delete a Record</h3>
+    <p><span class="method-delete">DELETE</span> <code>/v2/records/{record_id}</code></p>
+    <p>Soft-deletes a record. The record's status is set to <code>deleted</code> and it no longer appears in list responses by default. Deleted records can be restored within 30 days via a support request. After 30 days, the record and its content are permanently purged.</p>
+    <p>Requires <code>delete</code> scope. Returns <code>204 No Content</code> on success.</p>
+  </section>
+</section>
+
+<section>
+  <h2>6. Users API</h2>
+
+  <section>
+    <h3>6.1 List Users</h3>
+    <p><span class="method-get">GET</span> <code>/v2/users</code></p>
+    <p>Returns a paginated list of users in the authenticated account. Requires <code>admin</code> scope.</p>
+    <h4>Query Parameters</h4>
+    <table>
+      <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>limit</code></td><td>integer</td><td>No</td><td>Results per page (default 25, max 100)</td></tr>
+      <tr><td><code>cursor</code></td><td>string</td><td>No</td><td>Pagination cursor</td></tr>
+      <tr><td><code>role</code></td><td>string</td><td>No</td><td>Filter by role: <code>owner</code>, <code>admin</code>, <code>member</code>, <code>viewer</code></td></tr>
+      <tr><td><code>status</code></td><td>string</td><td>No</td><td>Filter by status: <code>active</code>, <code>invited</code>, <code>suspended</code></td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h3>6.2 Get a User</h3>
+    <p><span class="method-get">GET</span> <code>/v2/users/{user_id}</code></p>
+    <p>Returns a single user profile. Requires <code>admin</code> scope or the requesting user's own <code>user_id</code>.</p>
+  </section>
+
+  <section>
+    <h3>6.3 Invite a User</h3>
+    <p><span class="method-post">POST</span> <code>/v2/users/invite</code></p>
+    <p>Sends an invitation email to a new user. Requires <code>admin</code> scope.</p>
+    <h4>Request Body</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>email</code></td><td>string</td><td>Yes</td><td>Email address of the invitee</td></tr>
+      <tr><td><code>role</code></td><td>string</td><td>Yes</td><td><code>admin</code>, <code>member</code>, or <code>viewer</code></td></tr>
+      <tr><td><code>teams</code></td><td>array of strings</td><td>No</td><td>Team IDs to add the user to upon acceptance</td></tr>
+    </table>
+    <p>Returns <code>201 Created</code>. The invitation expires after 7 days. Returns <code>409 Conflict</code> if the email is already associated with an active user on the account.</p>
+  </section>
+
+  <section>
+    <h3>6.4 Update a User</h3>
+    <p><span class="method-patch">PATCH</span> <code>/v2/users/{user_id}</code></p>
+    <p>Updates a user's role or status. Requires <code>admin</code> scope. Cannot modify the account owner.</p>
+  </section>
+
+  <section>
+    <h3>6.5 Remove a User</h3>
+    <p><span class="method-delete">DELETE</span> <code>/v2/users/{user_id}</code></p>
+    <p>Removes a user from the account. Their records are reassigned to the account owner unless a <code>reassign_to</code> parameter is specified. Requires <code>admin</code> scope. Returns <code>204 No Content</code>.</p>
+  </section>
+</section>
+
+<section>
+  <h2>7. Search API</h2>
+
+  <section>
+    <h3>7.1 Search Records</h3>
+    <p><span class="method-post">POST</span> <code>/v2/search</code></p>
+    <p>Full-text and semantic search across records in the authenticated account.</p>
+    <h4>Request Body</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>query</code></td><td>string</td><td>Yes</td><td>Search query (max 500 characters)</td></tr>
+      <tr><td><code>mode</code></td><td>string</td><td>No</td><td><code>keyword</code>, <code>semantic</code>, or <code>hybrid</code> (default: <code>hybrid</code>)</td></tr>
+      <tr><td><code>limit</code></td><td>integer</td><td>No</td><td>Maximum results (default 10, max 50)</td></tr>
+      <tr><td><code>filters</code></td><td>object</td><td>No</td><td>Filter by <code>tags</code>, <code>created_after</code>, <code>created_before</code>, <code>status</code>, <code>metadata</code></td></tr>
+    </table>
+    <h4>Example Request</h4>
+    <pre>POST /v2/search HTTP/1.1
+Host: api.acmecorp.com
+Authorization: Bearer acme_at_8f2b...
+Content-Type: application/json
+
+{
+  "query": "revenue forecast Q3",
+  "mode": "hybrid",
+  "limit": 5,
+  "filters": {
+    "tags": ["finance"],
+    "created_after": "2025-01-01T00:00:00Z"
+  }
+}</pre>
+    <h4>Example Response</h4>
+    <pre>{
+  "data": [
+    {
+      "id": "rec_a1b2c3",
+      "name": "Q3 2025 Revenue Summary",
+      "snippet": "...projected revenue of $38.2M for Q3, representing 16% YoY growth...",
+      "score": 0.94,
+      "highlights": ["revenue", "Q3"]
+    }
+  ],
+  "meta": {
+    "request_id": "req_b4c5d6...",
+    "search_time_ms": 47,
+    "total_results": 12,
+    "timestamp": "2025-01-15T10:35:00Z"
+  }
+}</pre>
+    <p>Results are ranked by relevance score (0.0 to 1.0). In <code>hybrid</code> mode, scores combine keyword (BM25) and semantic (vector similarity) signals.</p>
+  </section>
+</section>
+
+<section>
+  <h2>8. Webhooks API</h2>
+
+  <section>
+    <h3>8.1 Register a Webhook</h3>
+    <p><span class="method-post">POST</span> <code>/v2/webhooks</code></p>
+    <h4>Request Body</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>url</code></td><td>string</td><td>Yes</td><td>HTTPS endpoint to receive events (must be publicly accessible)</td></tr>
+      <tr><td><code>events</code></td><td>array of strings</td><td>Yes</td><td>Events to subscribe to: <code>record.created</code>, <code>record.updated</code>, <code>record.deleted</code>, <code>user.invited</code>, <code>user.removed</code></td></tr>
+      <tr><td><code>secret</code></td><td>string</td><td>No</td><td>Shared secret for signature verification. Auto-generated if not provided.</td></tr>
+    </table>
+    <p>Returns <code>201 Created</code> with the webhook object including the <code>id</code> and <code>secret</code>.</p>
+  </section>
+
+  <section>
+    <h3>8.2 Webhook Delivery</h3>
+    <p>Events are delivered as <code>POST</code> requests to the registered URL with a JSON body:</p>
+    <pre>{
+  "id": "evt_m3n4o5",
+  "type": "record.updated",
+  "created_at": "2025-01-15T10:40:00Z",
+  "data": {
+    "record_id": "rec_a1b2c3",
+    "changes": ["content", "tags"]
+  }
+}</pre>
+    <p>Each delivery includes an <code>X-Acme-Signature</code> header containing an HMAC-SHA256 signature of the request body using the webhook secret. Verify this signature to ensure the request is from Acme Corp.</p>
+    <p><strong>Retry policy:</strong> If your endpoint does not respond with a 2xx status within 10 seconds, the delivery is retried up to 5 times with exponential backoff (10s, 30s, 90s, 270s, 810s). After 5 failures, the webhook is marked as failing and an email notification is sent to the account owner.</p>
+  </section>
+
+  <section>
+    <h3>8.3 List Webhooks</h3>
+    <p><span class="method-get">GET</span> <code>/v2/webhooks</code></p>
+    <p>Returns all registered webhooks for the authenticated account. Requires <code>admin</code> scope.</p>
+  </section>
+
+  <section>
+    <h3>8.4 Delete a Webhook</h3>
+    <p><span class="method-delete">DELETE</span> <code>/v2/webhooks/{webhook_id}</code></p>
+    <p>Removes a webhook subscription. Pending deliveries are cancelled. Returns <code>204 No Content</code>.</p>
+  </section>
+</section>
+
+<section>
+  <h2>9. Response Codes</h2>
+  <table>
+    <tr><th>Code</th><th>Meaning</th><th>When You'll See It</th></tr>
+    <tr><td>200</td><td>OK</td><td>Successful GET, PATCH requests</td></tr>
+    <tr><td>201</td><td>Created</td><td>Successful POST requests that create a resource</td></tr>
+    <tr><td>204</td><td>No Content</td><td>Successful DELETE requests</td></tr>
+    <tr><td>400</td><td>Bad Request</td><td>Malformed request, invalid parameters, limit out of range</td></tr>
+    <tr><td>401</td><td>Unauthorized</td><td>Missing, invalid, or expired authentication credentials</td></tr>
+    <tr><td>403</td><td>Forbidden</td><td>Authenticated but insufficient permissions for the requested operation</td></tr>
+    <tr><td>404</td><td>Not Found</td><td>Resource does not exist or is not accessible to the authenticated user</td></tr>
+    <tr><td>409</td><td>Conflict</td><td>Resource already exists (e.g., duplicate invite)</td></tr>
+    <tr><td>422</td><td>Unprocessable Entity</td><td>Request is well-formed but fails validation (missing required fields, invalid values)</td></tr>
+    <tr><td>429</td><td>Too Many Requests</td><td>Rate limit exceeded. Check <code>Retry-After</code> header.</td></tr>
+    <tr><td>500</td><td>Internal Server Error</td><td>Unexpected server error. Include <code>X-Request-ID</code> when contacting support.</td></tr>
+    <tr><td>503</td><td>Service Unavailable</td><td>API is temporarily unavailable (maintenance or overload). Retry with backoff.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>10. Changelog</h2>
+  <table>
+    <tr><th>Date</th><th>Version</th><th>Change</th></tr>
+    <tr><td>2025-01-15</td><td>v2.4</td><td>Added <code>hybrid</code> search mode (default). Added <code>metadata</code> filter to search.</td></tr>
+    <tr><td>2024-10-01</td><td>v2.3</td><td>Increased max <code>limit</code> from 50 to 100 for list endpoints.</td></tr>
+    <tr><td>2024-07-15</td><td>v2.2</td><td>Added webhook signature verification (<code>X-Acme-Signature</code>).</td></tr>
+    <tr><td>2024-04-01</td><td>v2.1</td><td>Added cursor-based pagination (replacing offset-based).</td></tr>
+    <tr><td>2024-03-01</td><td>v2.0</td><td>Initial v2 release. Breaking changes from v1: new auth format, JSON-only responses, renamed endpoints.</td></tr>
+  </table>
+</section>
+
+</body>
+</html>

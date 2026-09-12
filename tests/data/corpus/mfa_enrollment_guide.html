@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="MFA Enrollment Guide">
+  <meta name="category" content="IT">
+  <meta name="doc_type" content="guide">
+  <meta name="last_updated" content="2024-04-15">
+  <meta name="owner" content="IT Operations">
+  <meta name="classification" content="Internal">
+  <title>MFA Enrollment Guide</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 1.5em; color: #1a1a1a; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+    code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+    ol li, ul li { margin-bottom: 0.5em; }
+    .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 1em 0; }
+  </style>
+</head>
+<body>
+
+<h1>MFA Enrollment Guide</h1>
+
+<p><strong>Last Updated:</strong> April 15, 2024<br>
+<strong>Applies to:</strong> All Acme Corp employees and contractors</p>
+
+<section>
+  <h2>1. Why MFA Is Required</h2>
+  <p>Multi-factor authentication (MFA) is required for all Acme Corp accounts. MFA protects your account by requiring a second verification method in addition to your password. It is mandatory for VPN access, cloud applications, production systems, and any system handling Confidential or Restricted data.</p>
+</section>
+
+<section>
+  <h2>2. Supported Factors</h2>
+  <table>
+    <tr><th>Method</th><th>Recommended</th><th>Notes</th></tr>
+    <tr><td>Hardware security key (YubiKey, Titan)</td><td>Yes — preferred</td><td>Most secure; phishing-resistant. Acme Corp provides one YubiKey per employee on request.</td></tr>
+    <tr><td>Authenticator app (Google Authenticator, Authy, 1Password)</td><td>Yes</td><td>TOTP-based; works offline. Use this if you do not have a hardware key.</td></tr>
+    <tr><td>Push notification (Okta Verify)</td><td>Acceptable</td><td>Convenient but susceptible to push fatigue attacks. Do not approve prompts you did not initiate.</td></tr>
+    <tr><td>SMS</td><td>Not permitted</td><td>SMS is not an approved MFA method due to SIM-swapping and interception vulnerabilities.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>3. Enrollment Steps</h2>
+  <ol>
+    <li>Navigate to <code>sso.acmecorp.com/settings/mfa</code> and sign in with your Acme Corp credentials.</li>
+    <li>Click <strong>Add Authentication Method</strong>.</li>
+    <li>Select your preferred method:
+      <ul>
+        <li><strong>Hardware key:</strong> Insert your security key and follow the browser prompt to register it.</li>
+        <li><strong>Authenticator app:</strong> Scan the QR code displayed on screen with your authenticator app. Enter the 6-digit code to confirm.</li>
+        <li><strong>Push notification:</strong> Install Okta Verify on your phone, scan the QR code, and approve the test push.</li>
+      </ul>
+    </li>
+    <li>Enroll at least <strong>two methods</strong> (one primary, one backup). This ensures you can still log in if your primary method is unavailable.</li>
+    <li>Generate and save your recovery codes (see Section 4).</li>
+  </ol>
+</section>
+
+<section>
+  <h2>4. Recovery Codes</h2>
+  <p>During enrollment, you will be given 10 one-time recovery codes. Each code can be used once to log in if all your MFA methods are unavailable (e.g., lost phone and security key).</p>
+  <div class="warning">
+    <strong>Important:</strong> Store your recovery codes in a secure location — a password manager or a sealed envelope in a physically secure place. Do not store them in a plaintext file on your computer or in an unencrypted note on your phone.
+  </div>
+  <p>If you exhaust all recovery codes or lose access to them, contact IT at <a href="mailto:it-support@acmecorp.com">it-support@acmecorp.com</a> for an identity-verified account recovery. This process requires in-person identity verification or a video call with a government-issued ID.</p>
+</section>
+
+<section>
+  <h2>5. Troubleshooting</h2>
+  <table>
+    <tr><th>Issue</th><th>Resolution</th></tr>
+    <tr><td>Authenticator code not accepted</td><td>Ensure your phone's clock is synced automatically (Settings &gt; Date &amp; Time &gt; Automatic). TOTP codes are time-sensitive.</td></tr>
+    <tr><td>Hardware key not recognized</td><td>Try a different USB port. Ensure your browser supports WebAuthn (Chrome, Firefox, Edge, Safari all do).</td></tr>
+    <tr><td>Lost phone with authenticator app</td><td>Use your backup MFA method or a recovery code. Then re-enroll a new device.</td></tr>
+    <tr><td>Lost security key</td><td>Use your backup method to log in, then remove the lost key from your account and enroll a replacement.</td></tr>
+    <tr><td>All methods unavailable</td><td>Contact IT for identity-verified account recovery.</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>6. Support</h2>
+  <p>For MFA issues, contact IT at <a href="mailto:it-support@acmecorp.com">it-support@acmecorp.com</a> or Slack <code>#it-help</code>.</p>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Large binary files
+*.npy
+*.png
+
+# OS
+.DS_Store

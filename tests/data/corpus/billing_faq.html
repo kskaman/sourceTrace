@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="Billing FAQ">
+  <meta name="category" content="Product">
+  <meta name="doc_type" content="faq">
+  <meta name="last_updated" content="2025-01-15">
+  <meta name="owner" content="Finance">
+  <meta name="classification" content="Public">
+  <title>Acme Corp — Billing FAQ</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 1.5em; color: #1a1a1a; }
+    .faq-q { font-weight: bold; margin-top: 1.2em; }
+    .faq-a { margin-top: 0.3em; margin-bottom: 1.5em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+  </style>
+</head>
+<body>
+
+<h1>Billing FAQ</h1>
+<p><strong>Last Updated:</strong> January 15, 2025</p>
+
+<section>
+  <h2>Billing Cycles</h2>
+
+  <p class="faq-q">When does my billing cycle start?</p>
+  <div class="faq-a">
+    <p>Your billing cycle starts on the date you subscribe. Monthly plans are billed on the same calendar date each month. Annual plans are billed in full at the start of the contract and renew on the anniversary of the original subscription date.</p>
+  </div>
+
+  <p class="faq-q">Can I change my billing cycle from monthly to annual?</p>
+  <div class="faq-a">
+    <p>Yes. Switch to annual billing at any time under <strong>Billing &gt; Subscription &gt; Change Plan</strong>. The annual rate takes effect immediately, and you receive a prorated credit for the unused portion of your current monthly billing period. Annual billing saves approximately 10% compared to monthly billing.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Invoicing</h2>
+
+  <p class="faq-q">How do I access my invoices?</p>
+  <div class="faq-a">
+    <p>Invoices are available in your account under <strong>Billing &gt; Invoices</strong>. Each invoice is generated automatically after a payment is processed and includes a breakdown of charges by line item (base subscription, add-ons, usage overages, prorated adjustments).</p>
+  </div>
+
+  <p class="faq-q">Can I have invoices sent to my finance team automatically?</p>
+  <div class="faq-a">
+    <p>Yes. Under <strong>Billing &gt; Settings &gt; Invoice Recipients</strong>, add up to 5 email addresses. Invoices are sent to all listed recipients within 24 hours of generation.</p>
+  </div>
+
+  <p class="faq-q">Do you support purchase orders?</p>
+  <div class="faq-a">
+    <p>Purchase orders are supported for Enterprise customers. Provide your PO number during contract negotiation and it will appear on all invoices for that contract. For self-serve and Pro plans, PO numbers are not supported.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Payment Methods</h2>
+
+  <p class="faq-q">What payment methods are accepted?</p>
+  <div class="faq-a">
+    <table>
+      <tr><th>Method</th><th>Available On</th></tr>
+      <tr><td>Visa, Mastercard, American Express</td><td>All plans</td></tr>
+      <tr><td>ACH bank transfer</td><td>All plans</td></tr>
+      <tr><td>Wire transfer</td><td>Enterprise only</td></tr>
+      <tr><td>Purchase order / net terms</td><td>Enterprise only</td></tr>
+    </table>
+    <p>All credit card payments are processed by our PCI-compliant payment processor. Acme Corp does not store credit card numbers.</p>
+  </div>
+
+  <p class="faq-q">How do I update my payment method?</p>
+  <div class="faq-a">
+    <p>Go to <strong>Billing &gt; Payment Method &gt; Update</strong>. The new payment method is used for all future charges. Outstanding invoices already issued are charged to the method on file at the time of issue.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Proration</h2>
+
+  <p class="faq-q">What happens when I add seats mid-cycle?</p>
+  <div class="faq-a">
+    <p>When you add seats, the charge is prorated for the remaining days in the current billing period. For example, if you add 5 seats on day 15 of a 30-day monthly cycle on the Pro plan ($59/seat/month), the prorated charge is: 5 seats × $59 × (15/30) = $147.50. The full per-seat rate applies from the next billing cycle.</p>
+  </div>
+
+  <p class="faq-q">What happens when I remove seats?</p>
+  <div class="faq-a">
+    <p>Removed seats take effect at the end of the current billing period. No prorated credit is issued for the remaining days. The reduced seat count is reflected in the next invoice.</p>
+  </div>
+
+  <p class="faq-q">What happens when I upgrade my plan?</p>
+  <div class="faq-a">
+    <p>Upgrades are effective immediately. You are charged the prorated difference between your current plan and the new plan for the remainder of the billing period. The new plan rate applies in full from the next cycle.</p>
+  </div>
+
+  <p class="faq-q">What happens when I downgrade my plan?</p>
+  <div class="faq-a">
+    <p>Downgrades take effect at the start of the next billing cycle. You retain access to higher-tier features until the current period ends. No refund or credit is issued for the current period.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Usage Overages</h2>
+
+  <p class="faq-q">What counts as a usage overage?</p>
+  <div class="faq-a">
+    <p>Overages occur when your account exceeds the included limits for your plan in a billing period:</p>
+    <table>
+      <tr><th>Resource</th><th>Starter Limit</th><th>Pro Limit</th><th>Enterprise</th></tr>
+      <tr><td>API requests per day</td><td>10,000</td><td>100,000</td><td>Custom</td></tr>
+      <tr><td>Data export per month</td><td>1 GB</td><td>10 GB</td><td>Unlimited</td></tr>
+      <tr><td>Storage</td><td>5 GB</td><td>50 GB</td><td>Custom</td></tr>
+    </table>
+  </div>
+
+  <p class="faq-q">How are overages billed?</p>
+  <div class="faq-a">
+    <p>Overages are calculated at the end of each billing period and added to the next invoice:</p>
+    <table>
+      <tr><th>Resource</th><th>Overage Rate</th></tr>
+      <tr><td>API requests</td><td>$0.001 per request over limit</td></tr>
+      <tr><td>Data export</td><td>$0.10 per GB over limit</td></tr>
+      <tr><td>Storage</td><td>$0.05 per GB per month over limit</td></tr>
+    </table>
+    <p>To avoid unexpected charges, set up usage alerts under <strong>Billing &gt; Usage &gt; Alerts</strong>. You can receive notifications at 75%, 90%, and 100% of your plan limits.</p>
+  </div>
+
+  <p class="faq-q">Does the recent pricing change affect overages?</p>
+  <div class="faq-a">
+    <p>The Pro tier pricing change (from $49 to $59/seat/month, effective November 1, 2024) applies to the base subscription only. Overage rates are unchanged. Plan limits (API requests, export, storage) are also unchanged. See the pricing update announcement for full details.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Contact</h2>
+  <p>For billing questions, contact <a href="mailto:billing-support@acmecorp.com">billing-support@acmecorp.com</a>.</p>
+</section>
+
+</body>
+</html>

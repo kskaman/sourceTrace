@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="title" content="Admin Console Guide">
+  <meta name="category" content="Product">
+  <meta name="doc_type" content="guide">
+  <meta name="last_updated" content="2025-01-15">
+  <meta name="owner" content="Product">
+  <meta name="classification" content="Internal">
+  <title>Acme Corp — Admin Console Guide</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    h2 { margin-top: 1.5em; color: #1a1a1a; }
+    h3 { margin-top: 1em; color: #333; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #f5f5f5; }
+    code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<h1>Admin Console Guide</h1>
+<p><strong>Last Updated:</strong> January 15, 2025<br>
+<strong>Applies to:</strong> Account owners and users with the Admin role</p>
+
+<section>
+  <h2>1. Accessing the Admin Console</h2>
+  <p>The admin console is available at <code>app.acmecorp.com/admin</code>. Only users with the Owner or Admin role can access the console. Admins see a gear icon in the left sidebar navigation that links directly to it.</p>
+</section>
+
+<section>
+  <h2>2. User Management</h2>
+
+  <h3>2.1 Viewing Users</h3>
+  <p>The <strong>Users</strong> tab displays all users on the account with their name, email, role, status (active, invited, suspended), last login date, and MFA enrollment status.</p>
+
+  <h3>2.2 Inviting Users</h3>
+  <p>Click <strong>Invite User</strong>, enter the email address, select a role (Admin, Member, or Viewer), and optionally assign the user to one or more workspaces. The invitee receives an email with a link that expires after 7 days.</p>
+
+  <h3>2.3 Changing Roles</h3>
+  <p>Click a user's name, then <strong>Edit Role</strong>. Role changes take effect immediately. Downgrading an Admin to Member revokes access to the admin console. Only the account Owner can promote a user to Admin.</p>
+
+  <h3>2.4 Suspending and Removing Users</h3>
+  <p><strong>Suspend:</strong> Blocks the user from logging in while preserving their data and workspace memberships. Useful when an employee is on leave or under investigation. Suspended users do not count toward the seat limit for billing.</p>
+  <p><strong>Remove:</strong> Permanently removes the user from the account. Their records are reassigned to the account Owner unless a different assignee is specified. Removal cannot be undone; the user must be re-invited to regain access.</p>
+</section>
+
+<section>
+  <h2>3. SSO Configuration</h2>
+
+  <h3>3.1 Supported Protocols</h3>
+  <table>
+    <tr><th>Protocol</th><th>Providers Tested</th></tr>
+    <tr><td>SAML 2.0</td><td>Okta, Azure AD, OneLogin, PingFederate</td></tr>
+    <tr><td>OIDC</td><td>Okta, Google Workspace, Auth0</td></tr>
+  </table>
+
+  <h3>3.2 Setup Steps</h3>
+  <ol>
+    <li>Navigate to <strong>Admin &gt; Security &gt; Single Sign-On</strong>.</li>
+    <li>Select SAML 2.0 or OIDC.</li>
+    <li>Enter the metadata URL or upload the metadata XML from your identity provider.</li>
+    <li>Map identity provider attributes to Acme Corp fields (email, first name, last name, department).</li>
+    <li>Enable SSO. Optionally, enforce SSO (disabling password-based login for all non-Owner users).</li>
+    <li>Test the connection using the <strong>Test SSO</strong> button before enforcing.</li>
+  </ol>
+
+  <h3>3.3 SCIM Provisioning</h3>
+  <p>Enterprise customers can enable SCIM 2.0 provisioning to automatically create, update, and deactivate Acme Corp user accounts from their identity provider. Configure SCIM under <strong>Admin &gt; Security &gt; Provisioning</strong>. A SCIM bearer token is generated during setup — store it securely in your identity provider's configuration.</p>
+</section>
+
+<section>
+  <h2>4. Audit Log</h2>
+
+  <h3>4.1 Viewing the Audit Log</h3>
+  <p>The audit log is available under <strong>Admin &gt; Audit Log</strong>. It records all significant actions performed by users and the system:</p>
+  <table>
+    <tr><th>Event Category</th><th>Examples</th></tr>
+    <tr><td>Authentication</td><td>Login, logout, failed login, MFA challenge, password reset</td></tr>
+    <tr><td>User management</td><td>User invited, role changed, user suspended, user removed</td></tr>
+    <tr><td>Record operations</td><td>Record created, updated, deleted, restored, exported</td></tr>
+    <tr><td>Configuration</td><td>SSO configured, API key generated, webhook registered, integration connected</td></tr>
+    <tr><td>Billing</td><td>Plan changed, seats added, payment processed, refund issued</td></tr>
+  </table>
+
+  <h3>4.2 Filtering and Exporting</h3>
+  <p>Use the filters at the top of the log to narrow results by date range, user, event category, or specific action. The audit log is searchable by keyword. Export the filtered results as CSV for compliance reporting.</p>
+
+  <h3>4.3 Retention</h3>
+  <p>Audit log entries are retained for 90 days on Starter, Pro, and Premium plans. Enterprise customers have extended retention of 1 year in searchable storage plus 6 years in archive, accessible on request. See the Audit Log Retention policy for details.</p>
+</section>
+
+<section>
+  <h2>5. API Key Management</h2>
+
+  <h3>5.1 Generating Keys</h3>
+  <p>Navigate to <strong>Admin &gt; API &gt; Keys</strong> and click <strong>Generate New Key</strong>. Assign a name, select a permission scope (read, read-write, or admin), and optionally restrict the key to specific IP addresses. The key is displayed only once — copy it immediately. See the <a href="api_auth_docs.html">API Authentication</a> documentation for usage details.</p>
+
+  <h3>5.2 Managing Keys</h3>
+  <p>The API Keys list shows all active keys with their name, scope, creation date, last used date, and creator. You can revoke a key at any time by clicking <strong>Revoke</strong>. Revoked keys stop working immediately.</p>
+
+  <h3>5.3 Usage Monitoring</h3>
+  <p>Click a key's name to see usage statistics: requests per day, error rate, and top endpoints by volume. Set up alerts for unusual patterns (spike in 401 errors, requests from new IP addresses) under <strong>Admin &gt; API &gt; Alerts</strong>.</p>
+</section>
+
+<section>
+  <h2>6. Support</h2>
+  <p>For admin console issues, contact <a href="mailto:support@acmecorp.com">support@acmecorp.com</a> or use the in-app chat (Pro and above, business hours).</p>
+</section>
+
+</body>
+</html>

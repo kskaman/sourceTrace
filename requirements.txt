@@ -1,0 +1,17 @@
+openai>=1.0
+python-dotenv>=1.0
+pymupdf>=1.23
+numpy>=1.24
+python-docx>=1.1
+beautifulsoup4>=4.12
+pyyaml>=6.0
+sentence-transformers>=2.2
+umap-learn>=0.5
+matplotlib>=3.7
+scipy>=1.11
+faiss-cpu>=1.7
+psycopg2-binary>=2.9
+qdrant-client>=1.8
+pgvector>=0.2
+
+pytest>=8.0
