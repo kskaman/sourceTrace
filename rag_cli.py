@@ -71,7 +71,7 @@ def chat_loop(max_results: int = 10, answer_fn=None):
             break
 
         if answer_fn is None:
-            from src.retrieve.pipeline import answer
+            from src.retrieve import answer
 
             answer_fn = answer
 
