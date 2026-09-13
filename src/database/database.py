@@ -39,8 +39,16 @@ def create_tables(conn):
                 owner TEXT,
                 classification TEXT,
                 page_number INTEGER,
-                ingested_at TIMESTAMP DEFAULT NOW()
+                ingested_at TIMESTAMP DEFAULT NOW(),
+                search_vector TSVECTOR GENERATED ALWAYS AS (
+                    to_tsvector('english', content)
+                ) STORED
             );
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+            ADD COLUMN IF NOT EXISTS search_vector TSVECTOR
+            GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
         """)
         # Index for vector search
         cur.execute("""
@@ -60,5 +68,9 @@ def create_tables(conn):
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS chunks_category_idx ON chunks (category);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS chunks_search_vector_idx
+            ON chunks USING GIN (search_vector);
         """)
     conn.commit()

@@ -14,6 +14,7 @@ def test_create_tables_creates_chunks_table_with_expected_columns(db_conn):
         "id", "embedding", "content", "source_file", "file_path", "doc_type",
         "chunk_index", "total_chunks", "doc_hash", "title", "category",
         "last_updated", "owner", "classification", "page_number", "ingested_at",
+        "search_vector",
     }
     assert expected.issubset(columns)
 

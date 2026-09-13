@@ -8,15 +8,17 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ragcli_pgdata:/var/lib/postgresql/data
 
   qdrant:
     image: qdrant/qdrant:latest
     ports:
       - "6333:6333"
     volumes:
-      - qdrantdata:/qdrant/storage
+      - ragcli_qdrantdata:/qdrant/storage
 
 volumes:
-  pgdata:
-  qdrantdata:
+  ragcli_pgdata:
+    name: ragcli_pgdata
+  ragcli_qdrantdata:
+    name: ragcli_qdrantdata

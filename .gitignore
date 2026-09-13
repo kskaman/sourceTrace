@@ -12,3 +12,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# pytest cache
+.pytest_cache/
