@@ -13,6 +13,18 @@ def valid_source_path(value: str) -> Path:
     return path
 
 
+def valid_data_folder(value: str) -> str:
+    """Trim a data folder name and reject reserved or empty values."""
+    data_folder = value.strip()
+    if not data_folder:
+        raise argparse.ArgumentTypeError("folder name cannot be empty")
+    if data_folder.casefold() == "default":
+        raise argparse.ArgumentTypeError(
+            "folder name 'default' is reserved; choose a specific name"
+        )
+    return data_folder
+
+
 class HelpfulArgumentParser(argparse.ArgumentParser):
     """Argument parser that shows full usage help (not just a usage line) on bad input."""
 
@@ -48,12 +60,22 @@ def build_parser() -> argparse.ArgumentParser:
         type=valid_source_path,
         help="Path to an existing text file or folder.",
     )
-    
+    ingest_parser.add_argument(
+        "--folder",
+        required=True,
+        type=valid_data_folder,
+        help="Named data folder to store the indexed content in.",
+    )
 
     chat_parser = subparsers.add_parser(
         "chat", help="Search interactively through already indexed text."
     )
-    
+    chat_parser.add_argument(
+        "--folder",
+        required=True,
+        type=valid_data_folder,
+        help="Named data folder to search.",
+    )
     chat_parser.add_argument(
         "--results",
         type=int,
@@ -63,8 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-def chat_loop(max_results: int = 10, answer_fn=None):
-    print("Entering chat mode. Type 'exit' to quit.")
+def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
+    print(f"Entering chat mode for folder '{data_folder}'. Type 'exit' to quit.")
     while True:
         user_input = input("You: ")
         if user_input.lower() == "exit":
@@ -77,6 +99,7 @@ def chat_loop(max_results: int = 10, answer_fn=None):
 
         response = answer_fn(
             question=user_input,
+            data_folder=data_folder,
             k=max(50, max_results),
             n=max_results,
             use_reranker=True,
@@ -94,9 +117,9 @@ def main():
             # Imported lazily: this pulls in the embedding model, which is slow to
             # load and only needed once we know ingestion is actually happening.
             from src.ingest import ingest_corpus
-            ingest_corpus(str(args.path))
+            ingest_corpus(str(args.path), args.folder)
         elif args.mode == "chat":
-            chat_loop(args.results)
+            chat_loop(args.folder, args.results)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

@@ -64,7 +64,7 @@ def compute_file_hash(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
-def ingest_file(file_path: Path, conn) -> dict:
+def ingest_file(file_path: Path, conn, data_folder: str) -> dict:
     """Process a single file through the full pipeline."""
     file_path = Path(file_path)
     logger.info(f"Processing: {file_path.name}")
@@ -103,8 +103,8 @@ def ingest_file(file_path: Path, conn) -> dict:
                     (embedding, content, source_file, file_path, doc_type,
                      chunk_index, total_chunks, doc_hash,
                      title, category, last_updated, owner, classification,
-                     ingested_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     data_folder, ingested_at)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     embedding,
@@ -120,6 +120,7 @@ def ingest_file(file_path: Path, conn) -> dict:
                     meta.get("last_updated"),
                     meta.get("owner"),
                     meta.get("classification"),
+                    data_folder,
                     now,
                 ),
             )
@@ -137,12 +138,18 @@ def ingest_file(file_path: Path, conn) -> dict:
     }
 
 
-def check_document_status(file_path: Path, doc_hash: str, conn) -> str:
+def check_document_status(
+    file_path: Path, doc_hash: str, conn, data_folder: str
+) -> str:
     """Check if a document needs ingestion."""
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT doc_hash FROM chunks WHERE source_file = %s LIMIT 1",
-            (file_path.name,),
+            """
+            SELECT doc_hash FROM chunks
+            WHERE source_file = %s AND data_folder = %s
+            LIMIT 1
+            """,
+            (file_path.name, data_folder),
         )
         row = cur.fetchone()
 
@@ -154,22 +161,22 @@ def check_document_status(file_path: Path, doc_hash: str, conn) -> str:
         return "changed"
 
 
-def delete_document_chunks(source_file: str, conn):
+def delete_document_chunks(source_file: str, conn, data_folder: str):
     """Remove all chunks for a given source file."""
     with conn.cursor() as cur:
         cur.execute(
-            "DELETE FROM chunks WHERE source_file = %s",
-            (source_file,),
+            "DELETE FROM chunks WHERE source_file = %s AND data_folder = %s",
+            (source_file, data_folder),
         )
     conn.commit()
 
 
-def ingest_file_idempotent(file_path: Path, conn) -> dict:
+def ingest_file_idempotent(file_path: Path, conn, data_folder: str) -> dict:
     """Ingest a file with idempotency checks."""
     file_path = Path(file_path)
     doc_hash = compute_file_hash(file_path)
 
-    status = check_document_status(file_path, doc_hash, conn)
+    status = check_document_status(file_path, doc_hash, conn, data_folder)
 
     if status == "unchanged":
         logger.info(f"Skipping {file_path.name}: unchanged (hash match)")
@@ -177,6 +184,6 @@ def ingest_file_idempotent(file_path: Path, conn) -> dict:
 
     if status == "changed":
         logger.info(f"Re-ingesting {file_path.name}: content changed")
-        delete_document_chunks(file_path.name, conn)
+        delete_document_chunks(file_path.name, conn, data_folder)
 
-    return ingest_file(file_path, conn)
+    return ingest_file(file_path, conn, data_folder)

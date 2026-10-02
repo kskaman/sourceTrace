@@ -11,12 +11,13 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".md", ".html", ".htm", ".docx", ".txt"}
 
-def ingest_corpus(corpus_dir: str):
+def ingest_corpus(corpus_dir: str, data_folder: str):
     """Ingest a supported file or all supported documents from a directory."""
     
     corpus_path = Path(corpus_dir)
 
     print(f"Ingesting from path: {corpus_path}")
+    print(f"Data folder: {data_folder}")
     
     if corpus_path.is_file():
         if corpus_path.suffix.lower() not in SUPPORTED_EXTENSIONS:
@@ -44,7 +45,7 @@ def ingest_corpus(corpus_dir: str):
 
     for file_path in files:
         try:
-            result = ingest_file_idempotent(file_path, conn)
+            result = ingest_file_idempotent(file_path, conn, data_folder)
 
             if result["status"] == "success":
                 results["success"].append(result)

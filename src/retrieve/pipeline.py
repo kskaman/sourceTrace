@@ -83,9 +83,15 @@ def build_prompt(question: str, chunks: list[dict]) -> str:
 
 
 def answer(
-    question: str, k: int = 20, n: int = 5, use_reranker: bool = True
+    question: str,
+    data_folder: str,
+    k: int = 20,
+    n: int = 5,
+    use_reranker: bool = True,
 ) -> dict:
-    candidates = hybrid_candidates(question, k=k)
+    candidates = hybrid_candidates(
+        question, k=k, filters={"data_folder": data_folder}
+    )
     if not candidates:
         return {
             "answer": NO_INDEXED_REFERENCES_MESSAGE,

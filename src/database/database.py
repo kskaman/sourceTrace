@@ -38,6 +38,7 @@ def create_tables(conn):
                 last_updated TEXT,
                 owner TEXT,
                 classification TEXT,
+                data_folder TEXT NOT NULL,
                 page_number INTEGER,
                 ingested_at TIMESTAMP DEFAULT NOW(),
                 search_vector TSVECTOR GENERATED ALWAYS AS (
@@ -49,6 +50,44 @@ def create_tables(conn):
             ALTER TABLE chunks
             ADD COLUMN IF NOT EXISTS search_vector TSVECTOR
             GENERATED ALWAYS AS (to_tsvector('english', content)) STORED;
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+            ADD COLUMN IF NOT EXISTS data_folder TEXT;
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+            ALTER COLUMN data_folder DROP DEFAULT;
+        """)
+    conn.commit()
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT COUNT(*) FROM chunks
+            WHERE data_folder IS NULL
+               OR btrim(data_folder) = ''
+               OR lower(data_folder) = 'default';
+        """)
+        invalid_folder_count = cur.fetchone()[0]
+        if invalid_folder_count:
+            raise RuntimeError(
+                "Existing chunks need a named data folder. Update data_folder for "
+                "rows where it is null, blank, or 'default', then retry."
+            )
+
+        cur.execute("""
+            ALTER TABLE chunks
+            ALTER COLUMN data_folder SET NOT NULL;
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+            DROP CONSTRAINT IF EXISTS chunks_data_folder_valid;
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+            ADD CONSTRAINT chunks_data_folder_valid CHECK (
+                btrim(data_folder) <> '' AND lower(data_folder) <> 'default'
+            );
         """)
         # Index for vector search
         cur.execute("""
@@ -68,6 +107,10 @@ def create_tables(conn):
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS chunks_category_idx ON chunks (category);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS chunks_folder_source_idx
+            ON chunks (data_folder, source_file);
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS chunks_search_vector_idx
