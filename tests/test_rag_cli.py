@@ -59,6 +59,16 @@ def test_build_parser_parses_chat_mode_with_custom_results():
     assert args.results == 5
 
 
+def test_build_parser_parses_delete_folder_mode():
+    args = rag_cli.build_parser().parse_args(
+        ["delete-folder", "--folder", "policies", "--yes"]
+    )
+
+    assert args.mode == "delete-folder"
+    assert args.folder == "policies"
+    assert args.yes is True
+
+
 def test_build_parser_requires_a_mode():
     with pytest.raises(SystemExit):
         rag_cli.build_parser().parse_args([])
@@ -84,7 +94,7 @@ def test_build_parser_shows_help_and_reason_on_missing_path(capsys):
     assert "Why this failed:" in captured.err
 
 
-@pytest.mark.parametrize("mode", ["ingest", "chat"])
+@pytest.mark.parametrize("mode", ["ingest", "chat", "delete-folder"])
 def test_build_parser_requires_folder(mode, tmp_path):
     arguments = [mode]
     if mode == "ingest":
@@ -136,6 +146,54 @@ def test_main_dispatches_to_chat_mode(monkeypatch, capsys):
 
     assert calls["max_results"] == 3
     assert calls["data_folder"] == "policies"
+
+
+def test_main_dispatches_to_delete_folder(monkeypatch):
+    calls = {}
+    monkeypatch.setattr(
+        rag_cli,
+        "delete_folder",
+        lambda data_folder, assume_yes: calls.update(
+            {"data_folder": data_folder, "assume_yes": assume_yes}
+        ),
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["rag_cli", "delete-folder", "--folder", "policies", "--yes"],
+    )
+
+    rag_cli.main()
+
+    assert calls == {"data_folder": "policies", "assume_yes": True}
+
+
+def test_delete_folder_cancels_when_name_does_not_match(monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda _: "wrong-folder")
+
+    deleted_count = rag_cli.delete_folder("policies")
+
+    assert deleted_count == 0
+    assert "Deletion cancelled." in capsys.readouterr().out
+
+
+def test_delete_folder_confirms_and_reports_deleted_chunks(monkeypatch, capsys):
+    class FakeConnection:
+        def close(self):
+            pass
+
+    conn = FakeConnection()
+    monkeypatch.setattr("builtins.input", lambda _: "policies")
+    monkeypatch.setattr("src.database.get_connection", lambda: conn)
+    monkeypatch.setattr("src.database.create_tables", lambda connection: None)
+    monkeypatch.setattr(
+        "src.database.delete_data_folder",
+        lambda data_folder, connection: 12,
+    )
+
+    deleted_count = rag_cli.delete_folder("policies")
+
+    assert deleted_count == 12
+    assert "Deleted folder 'policies' (12 chunks)." in capsys.readouterr().out
 
 
 def test_chat_loop_exits_without_loading_retrieval(monkeypatch, capsys):

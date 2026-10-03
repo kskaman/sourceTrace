@@ -42,14 +42,14 @@ def show_help(parser: argparse.ArgumentParser, reason: str | None = None) -> Non
 
 def build_parser() -> argparse.ArgumentParser:
     parser = HelpfulArgumentParser(
-        description="Ingest local text into an index or chat with an existing index."
+        description="Ingest, query, or delete named folders of indexed local data."
     )
     subparsers = parser.add_subparsers(
         dest="mode",
         required=True,
         title="modes",
         metavar="MODE",
-        help="Operation mode: ingest or chat.",
+        help="Operation mode: ingest, chat, or delete-folder.",
     )
     
     ingest_parser = subparsers.add_parser(
@@ -83,6 +83,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum retrieved chunks per question (default: 10).",
     )
 
+    delete_parser = subparsers.add_parser(
+        "delete-folder", help="Delete all indexed data in a named folder."
+    )
+    delete_parser.add_argument(
+        "--folder",
+        required=True,
+        type=valid_data_folder,
+        help="Named data folder to delete.",
+    )
+    delete_parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Delete without asking for confirmation.",
+    )
+
     return parser
 
 def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
@@ -108,6 +123,32 @@ def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
         print(f"\nContext: {response['context']}\n")
 
 
+def delete_folder(data_folder: str, assume_yes: bool = False) -> int:
+    """Confirm and delete every indexed chunk in a named data folder."""
+    if not assume_yes:
+        confirmation = input(
+            f"Type the folder name '{data_folder}' to permanently delete it: "
+        )
+        if confirmation != data_folder:
+            print("Deletion cancelled.")
+            return 0
+
+    from src.database import create_tables, delete_data_folder, get_connection
+
+    conn = get_connection()
+    try:
+        create_tables(conn)
+        deleted_count = delete_data_folder(data_folder, conn)
+    finally:
+        conn.close()
+
+    if deleted_count:
+        print(f"Deleted folder '{data_folder}' ({deleted_count} chunks).")
+    else:
+        print(f"Folder '{data_folder}' was not found; nothing was deleted.")
+    return deleted_count
+
+
 def main():
     parser = build_parser()
     args = parser.parse_args()
@@ -120,6 +161,8 @@ def main():
             ingest_corpus(str(args.path), args.folder)
         elif args.mode == "chat":
             chat_loop(args.folder, args.results)
+        elif args.mode == "delete-folder":
+            delete_folder(args.folder, args.yes)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

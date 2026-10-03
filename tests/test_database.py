@@ -1,7 +1,7 @@
 """Tests for src.database (table setup)."""
 import pytest
 
-from src.database import create_tables
+from src.database import create_tables, delete_data_folder
 
 
 def test_create_tables_creates_chunks_table_with_expected_columns(db_conn):
@@ -64,3 +64,23 @@ def test_create_tables_is_idempotent(db_conn):
         cur.execute("SELECT COUNT(*) FROM chunks")
         count = cur.fetchone()[0]
     assert count == 0
+
+
+def test_delete_data_folder_removes_only_selected_folder(corpus_dir, db_conn):
+    from src.ingest.pipeline import ingest_file
+
+    file_path = corpus_dir / "refund_policy.md"
+    policies = ingest_file(file_path, db_conn, "policies")
+    ingest_file(file_path, db_conn, "archive")
+
+    deleted_count = delete_data_folder("policies", db_conn)
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT data_folder, COUNT(*) FROM chunks GROUP BY data_folder"
+        )
+        remaining = dict(cur.fetchall())
+
+    assert deleted_count == policies["chunks"]
+    assert "policies" not in remaining
+    assert remaining["archive"] > 0

@@ -117,3 +117,15 @@ def create_tables(conn):
             ON chunks USING GIN (search_vector);
         """)
     conn.commit()
+
+
+def delete_data_folder(data_folder: str, conn) -> int:
+    """Delete all chunks in a data folder and return the number removed."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "DELETE FROM chunks WHERE data_folder = %s",
+            (data_folder,),
+        )
+        deleted_count = cur.rowcount
+    conn.commit()
+    return deleted_count
