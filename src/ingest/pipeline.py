@@ -8,9 +8,6 @@ from datetime import datetime, timezone
 from .document_parser import parse_document
 from .text_cleaner import clean_text
 from .embedder import embed_chunks_with_retry
-from ..database import get_connection, create_tables
-
-
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 

@@ -42,14 +42,14 @@ def show_help(parser: argparse.ArgumentParser, reason: str | None = None) -> Non
 
 def build_parser() -> argparse.ArgumentParser:
     parser = HelpfulArgumentParser(
-        description="Ingest, query, or delete named folders of indexed local data."
+        description="Ingest, query, and manage named folders of indexed local data."
     )
     subparsers = parser.add_subparsers(
         dest="mode",
         required=True,
         title="modes",
         metavar="MODE",
-        help="Operation mode: ingest, chat, or delete-folder.",
+        help="Operation mode for indexed data and folder management.",
     )
     
     ingest_parser = subparsers.add_parser(
@@ -98,6 +98,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delete without asking for confirmation.",
     )
 
+    subparsers.add_parser(
+        "list-folders", help="List indexed data folders and their contents."
+    )
+
+    rename_parser = subparsers.add_parser(
+        "rename-folder", help="Rename an indexed data folder."
+    )
+    rename_parser.add_argument(
+        "--folder",
+        required=True,
+        type=valid_data_folder,
+        help="Current data folder name.",
+    )
+    rename_parser.add_argument(
+        "--new-name",
+        required=True,
+        type=valid_data_folder,
+        help="New data folder name.",
+    )
+
     return parser
 
 def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
@@ -133,11 +153,10 @@ def delete_folder(data_folder: str, assume_yes: bool = False) -> int:
             print("Deletion cancelled.")
             return 0
 
-    from src.database import create_tables, delete_data_folder, get_connection
+    from src.database import delete_data_folder, get_connection
 
     conn = get_connection()
     try:
-        create_tables(conn)
         deleted_count = delete_data_folder(data_folder, conn)
     finally:
         conn.close()
@@ -147,6 +166,49 @@ def delete_folder(data_folder: str, assume_yes: bool = False) -> int:
     else:
         print(f"Folder '{data_folder}' was not found; nothing was deleted.")
     return deleted_count
+
+
+def list_folders() -> list[dict]:
+    """Print named data folders with document and chunk counts."""
+    from src.database import get_connection, list_data_folders
+
+    conn = get_connection()
+    try:
+        folders = list_data_folders(conn)
+    finally:
+        conn.close()
+
+    if not folders:
+        print("No data folders found.")
+        return folders
+
+    print("Data folders:")
+    for folder in folders:
+        print(
+            f"  {folder['name']}: {folder['document_count']} documents, "
+            f"{folder['chunk_count']} chunks"
+        )
+    return folders
+
+
+def rename_folder(data_folder: str, new_name: str) -> int:
+    """Rename a data folder and report the number of chunks updated."""
+    from src.database import get_connection, rename_data_folder
+
+    conn = get_connection()
+    try:
+        renamed_count = rename_data_folder(data_folder, new_name, conn)
+    finally:
+        conn.close()
+
+    if renamed_count:
+        print(
+            f"Renamed folder '{data_folder}' to '{new_name}' "
+            f"({renamed_count} chunks)."
+        )
+    else:
+        print(f"Folder '{data_folder}' was not found; nothing was renamed.")
+    return renamed_count
 
 
 def main():
@@ -163,6 +225,10 @@ def main():
             chat_loop(args.folder, args.results)
         elif args.mode == "delete-folder":
             delete_folder(args.folder, args.yes)
+        elif args.mode == "list-folders":
+            list_folders()
+        elif args.mode == "rename-folder":
+            rename_folder(args.folder, args.new_name)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

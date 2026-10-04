@@ -1,7 +1,13 @@
 """Tests for src.database (table setup)."""
 import pytest
 
-from src.database import create_tables, delete_data_folder
+from src.database import (
+    create_tables,
+    initialize_database,
+    delete_data_folder,
+    list_data_folders,
+    rename_data_folder,
+)
 
 
 def test_create_tables_creates_chunks_table_with_expected_columns(db_conn):
@@ -66,6 +72,21 @@ def test_create_tables_is_idempotent(db_conn):
     assert count == 0
 
 
+def test_initialize_database_skips_creation_when_schema_exists(
+    monkeypatch, db_conn
+):
+    create_calls = []
+    monkeypatch.setattr(
+        "src.database.database.create_tables",
+        lambda conn: create_calls.append(conn),
+    )
+
+    was_created = initialize_database(db_conn)
+
+    assert was_created is False
+    assert create_calls == []
+
+
 def test_delete_data_folder_removes_only_selected_folder(corpus_dir, db_conn):
     from src.ingest.pipeline import ingest_file
 
@@ -84,3 +105,57 @@ def test_delete_data_folder_removes_only_selected_folder(corpus_dir, db_conn):
     assert deleted_count == policies["chunks"]
     assert "policies" not in remaining
     assert remaining["archive"] > 0
+
+
+def test_list_data_folders_returns_sorted_counts(corpus_dir, db_conn):
+    from src.ingest.pipeline import ingest_file
+
+    file_path = corpus_dir / "refund_policy.md"
+    archive = ingest_file(file_path, db_conn, "archive")
+    policies = ingest_file(file_path, db_conn, "policies")
+
+    folders = list_data_folders(db_conn)
+
+    assert folders == [
+        {
+            "name": "archive",
+            "document_count": 1,
+            "chunk_count": archive["chunks"],
+        },
+        {
+            "name": "policies",
+            "document_count": 1,
+            "chunk_count": policies["chunks"],
+        },
+    ]
+
+
+def test_rename_data_folder_updates_only_selected_folder(corpus_dir, db_conn):
+    from src.ingest.pipeline import ingest_file
+
+    file_path = corpus_dir / "refund_policy.md"
+    policies = ingest_file(file_path, db_conn, "policies")
+    ingest_file(file_path, db_conn, "archive")
+
+    renamed_count = rename_data_folder("policies", "handbook", db_conn)
+
+    assert renamed_count == policies["chunks"]
+    assert [folder["name"] for folder in list_data_folders(db_conn)] == [
+        "archive",
+        "handbook",
+    ]
+
+
+def test_rename_data_folder_rejects_existing_destination(corpus_dir, db_conn):
+    from src.ingest.pipeline import ingest_file
+
+    file_path = corpus_dir / "refund_policy.md"
+    ingest_file(file_path, db_conn, "policies")
+    ingest_file(file_path, db_conn, "archive")
+
+    with pytest.raises(ValueError, match="already exists"):
+        rename_data_folder("policies", "archive", db_conn)
+
+
+def test_rename_data_folder_returns_zero_for_missing_source(db_conn):
+    assert rename_data_folder("missing", "new-name", db_conn) == 0

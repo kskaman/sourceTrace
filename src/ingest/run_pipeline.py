@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 import sys
 
-from ..database import get_connection, create_tables
+from ..database import get_connection, initialize_database
 
 from .pipeline import ingest_file_idempotent
 
@@ -39,7 +39,7 @@ def ingest_corpus(corpus_dir: str, data_folder: str):
     print(f"Found {len(files)} files to process")
 
     conn = get_connection()
-    create_tables(conn)
+    initialize_database(conn)
 
     results = {"success": [], "skipped": [], "failed": []}
 

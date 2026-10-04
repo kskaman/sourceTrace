@@ -69,6 +69,24 @@ def test_build_parser_parses_delete_folder_mode():
     assert args.yes is True
 
 
+def test_build_parser_parses_folder_management_modes():
+    list_args = rag_cli.build_parser().parse_args(["list-folders"])
+    rename_args = rag_cli.build_parser().parse_args(
+        [
+            "rename-folder",
+            "--folder",
+            "policies",
+            "--new-name",
+            "handbook",
+        ]
+    )
+
+    assert list_args.mode == "list-folders"
+    assert rename_args.mode == "rename-folder"
+    assert rename_args.folder == "policies"
+    assert rename_args.new_name == "handbook"
+
+
 def test_build_parser_requires_a_mode():
     with pytest.raises(SystemExit):
         rag_cli.build_parser().parse_args([])
@@ -94,7 +112,9 @@ def test_build_parser_shows_help_and_reason_on_missing_path(capsys):
     assert "Why this failed:" in captured.err
 
 
-@pytest.mark.parametrize("mode", ["ingest", "chat", "delete-folder"])
+@pytest.mark.parametrize(
+    "mode", ["ingest", "chat", "delete-folder", "rename-folder"]
+)
 def test_build_parser_requires_folder(mode, tmp_path):
     arguments = [mode]
     if mode == "ingest":
@@ -104,6 +124,13 @@ def test_build_parser_requires_folder(mode, tmp_path):
 
     with pytest.raises(SystemExit):
         rag_cli.build_parser().parse_args(arguments)
+
+
+def test_build_parser_requires_new_name_for_rename():
+    with pytest.raises(SystemExit):
+        rag_cli.build_parser().parse_args(
+            ["rename-folder", "--folder", "policies"]
+        )
 
 
 def test_main_dispatches_to_ingest_corpus(tmp_path, monkeypatch):
@@ -167,6 +194,40 @@ def test_main_dispatches_to_delete_folder(monkeypatch):
     assert calls == {"data_folder": "policies", "assume_yes": True}
 
 
+def test_main_dispatches_to_list_folders(monkeypatch):
+    calls = []
+    monkeypatch.setattr(rag_cli, "list_folders", lambda: calls.append(True))
+    monkeypatch.setattr("sys.argv", ["rag_cli", "list-folders"])
+
+    rag_cli.main()
+
+    assert calls == [True]
+
+
+def test_main_dispatches_to_rename_folder(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        rag_cli,
+        "rename_folder",
+        lambda data_folder, new_name: calls.append((data_folder, new_name)),
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "rag_cli",
+            "rename-folder",
+            "--folder",
+            "policies",
+            "--new-name",
+            "handbook",
+        ],
+    )
+
+    rag_cli.main()
+
+    assert calls == [("policies", "handbook")]
+
+
 def test_delete_folder_cancels_when_name_does_not_match(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda _: "wrong-folder")
 
@@ -184,7 +245,6 @@ def test_delete_folder_confirms_and_reports_deleted_chunks(monkeypatch, capsys):
     conn = FakeConnection()
     monkeypatch.setattr("builtins.input", lambda _: "policies")
     monkeypatch.setattr("src.database.get_connection", lambda: conn)
-    monkeypatch.setattr("src.database.create_tables", lambda connection: None)
     monkeypatch.setattr(
         "src.database.delete_data_folder",
         lambda data_folder, connection: 12,
@@ -194,6 +254,47 @@ def test_delete_folder_confirms_and_reports_deleted_chunks(monkeypatch, capsys):
 
     assert deleted_count == 12
     assert "Deleted folder 'policies' (12 chunks)." in capsys.readouterr().out
+
+
+def test_list_folders_prints_counts(monkeypatch, capsys):
+    class FakeConnection:
+        def close(self):
+            pass
+
+    conn = FakeConnection()
+    folders = [
+        {"name": "policies", "document_count": 3, "chunk_count": 12}
+    ]
+    monkeypatch.setattr("src.database.get_connection", lambda: conn)
+    monkeypatch.setattr(
+        "src.database.list_data_folders", lambda connection: folders
+    )
+
+    result = rag_cli.list_folders()
+
+    assert result == folders
+    assert "policies: 3 documents, 12 chunks" in capsys.readouterr().out
+
+
+def test_rename_folder_reports_updated_chunks(monkeypatch, capsys):
+    class FakeConnection:
+        def close(self):
+            pass
+
+    conn = FakeConnection()
+    monkeypatch.setattr("src.database.get_connection", lambda: conn)
+    monkeypatch.setattr(
+        "src.database.rename_data_folder",
+        lambda data_folder, new_name, connection: 12,
+    )
+
+    renamed_count = rag_cli.rename_folder("policies", "handbook")
+
+    assert renamed_count == 12
+    assert (
+        "Renamed folder 'policies' to 'handbook' (12 chunks)."
+        in capsys.readouterr().out
+    )
 
 
 def test_chat_loop_exits_without_loading_retrieval(monkeypatch, capsys):
