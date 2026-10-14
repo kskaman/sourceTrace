@@ -1,8 +1,11 @@
+import json
 import logging
 from pathlib import Path
 import sys
 
+from ..config import CONFIG
 from ..database import get_connection, initialize_database
+from ..observability import log_event, new_trace, span, trace_summary, write_trace
 
 from .pipeline import ingest_file_idempotent
 
@@ -39,31 +42,51 @@ def ingest_corpus(corpus_dir: str, data_folder: str):
     print(f"Found {len(files)} files to process")
 
     conn = get_connection()
-    initialize_database(conn)
-
     results = {"success": [], "skipped": [], "failed": []}
+    interrupted = False
 
-    for file_path in files:
-        try:
-            result = ingest_file_idempotent(file_path, conn, data_folder)
+    try:
+        initialize_database(conn)
 
-            if result["status"] == "success":
-                results["success"].append(result)
-            else:
-                results["skipped"].append(result)
+        for file_path in files:
+            new_trace()
+            try:
+                with span("ingest.file", file=file_path.name, data_folder=data_folder):
+                    result = ingest_file_idempotent(file_path, conn, data_folder)
+                log_event(
+                    "ingest.result",
+                    status=result["status"],
+                    reason=result.get("reason"),
+                    chunks=result.get("chunks", 0),
+                )
 
-        except Exception as e:
-            logger.error(f"Failed to process {file_path.name}: {e}")
-            results["failed"].append({
-                "file": file_path.name,
-                "status": "failed",
-                "error": str(e),
-            })
+                if result["status"] == "success":
+                    results["success"].append(result)
+                else:
+                    results["skipped"].append(result)
 
-    conn.close()
+            except KeyboardInterrupt:
+                interrupted = True
+                conn.rollback()
+                break
+            except Exception as e:
+                logger.error(f"Failed to process {file_path.name}: {e}")
+                conn.rollback()
+                results["failed"].append({
+                    "file": file_path.name,
+                    "status": "failed",
+                    "error": str(e),
+                })
+            finally:
+                if CONFIG["print_trace"]:
+                    print(json.dumps(trace_summary()))
+                if CONFIG["trace_dir"]:
+                    write_trace(CONFIG["trace_dir"], label=file_path.stem)
+    finally:
+        conn.close()
 
     print(f"\n{'=' * 50}")
-    print("Ingestion complete:")
+    print("Ingestion interrupted:" if interrupted else "Ingestion complete:")
     print(f"  Succeeded:  {len(results['success'])}")
     print(f"  Skipped:    {len(results['skipped'])}")
     print(f"  Failed:     {len(results['failed'])}")
@@ -79,3 +102,6 @@ def ingest_corpus(corpus_dir: str, data_folder: str):
     )
 
     print(f"\nTotal chunks indexed: {total_chunks}")
+
+    if interrupted:
+        raise KeyboardInterrupt

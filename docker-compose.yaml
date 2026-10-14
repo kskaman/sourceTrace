@@ -10,6 +10,17 @@ services:
     volumes:
       - ragcli_pgdata:/var/lib/postgresql/data
 
+  pgvector-test:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: rag-cli
+      POSTGRES_PASSWORD: rag-cli
+      POSTGRES_DB: sourceTraceTest
+    ports:
+      - "5433:5432"
+    volumes:
+      - ragcli_test_pgdata:/var/lib/postgresql/data
+
   qdrant:
     image: qdrant/qdrant:latest
     ports:
@@ -20,5 +31,7 @@ services:
 volumes:
   ragcli_pgdata:
     name: ragcli_pgdata
+  ragcli_test_pgdata:
+    name: sourcetrace_test_pgdata
   ragcli_qdrantdata:
     name: ragcli_qdrantdata

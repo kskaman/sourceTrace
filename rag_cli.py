@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import argparse
 from pathlib import Path
@@ -23,6 +24,14 @@ def valid_data_folder(value: str) -> str:
             "folder name 'default' is reserved; choose a specific name"
         )
     return data_folder
+
+
+def positive_int(value: str) -> int:
+    """Parse a command-line integer that must be greater than zero."""
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be a positive integer")
+    return parsed
 
 
 class HelpfulArgumentParser(argparse.ArgumentParser):
@@ -76,11 +85,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=valid_data_folder,
         help="Named data folder to search.",
     )
+    from src.config import CONFIG
+
     chat_parser.add_argument(
         "--results",
-        type=int,
-        default=10,
-        help="Maximum retrieved chunks per question (default: 10).",
+        type=positive_int,
+        default=CONFIG["context_n"],
+        help=f"Maximum retrieved chunks per question (default: CONTEXT_N={CONFIG['context_n']}).",
     )
 
     delete_parser = subparsers.add_parser(
@@ -120,10 +131,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
+def require_data_folder(data_folder: str) -> None:
+    """Raise a clear error unless the requested folder contains indexed data."""
+    from src.database import data_folder_exists, get_connection
+
+    conn = get_connection()
+    try:
+        exists = data_folder_exists(data_folder, conn)
+    finally:
+        conn.close()
+    if not exists:
+        raise ValueError(
+            f"Data folder '{data_folder}' does not exist or contains no indexed data. "
+            "Ingest documents into that folder first."
+        )
+
+
+def chat_loop(data_folder: str, max_results: int | None = None, answer_fn=None):
+    from src.config import CONFIG
+
+    require_data_folder(data_folder)
+    if max_results is None:
+        max_results = CONFIG["context_n"]
+    if max_results <= 0:
+        raise ValueError("max_results must be a positive integer")
     print(f"Entering chat mode for folder '{data_folder}'. Type 'exit' to quit.")
     while True:
-        user_input = input("You: ")
+        try:
+            user_input = input("You: ")
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye.")
+            break
         if user_input.lower() == "exit":
             break
 
@@ -132,15 +170,35 @@ def chat_loop(data_folder: str, max_results: int = 10, answer_fn=None):
 
             answer_fn = answer
 
-        response = answer_fn(
-            question=user_input,
-            data_folder=data_folder,
-            k=max(50, max_results),
-            n=max_results,
-            use_reranker=True,
-        )
+        try:
+            response = answer_fn(
+                question=user_input,
+                data_folder=data_folder,
+                k=max(CONFIG["candidate_k"], max_results),
+                n=max_results,
+                use_reranker=CONFIG["use_reranker"],
+            )
+        except KeyboardInterrupt:
+            print("\nQuestion cancelled.")
+            continue
+        except Exception as e:
+            print(f"Error answering question: {e}", file=sys.stderr)
+            report_trace()
+            continue
         print(f"Assistant: {response['answer']}")
         print(f"\nContext: {response['context']}\n")
+        report_trace()
+
+
+def report_trace() -> None:
+    """Show and/or save the trace of the last request, per PRINT_TRACE / TRACE_DIR."""
+    from src.config import CONFIG
+    from src.observability import trace_summary, write_trace
+
+    if CONFIG["print_trace"]:
+        print(f"Trace: {json.dumps(trace_summary())}\n")
+    if CONFIG["trace_dir"]:
+        write_trace(CONFIG["trace_dir"], label="chat")
 
 
 def delete_folder(data_folder: str, assume_yes: bool = False) -> int:
@@ -211,7 +269,20 @@ def rename_folder(data_folder: str, new_name: str) -> int:
     return renamed_count
 
 
+def load_config() -> dict:
+    """Validate the environment up front so a bad setup stops before any work starts."""
+    from src.config import CONFIG
+
+    return CONFIG
+
+
 def main():
+    try:
+        load_config()
+    except Exception as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        sys.exit(1)
+
     parser = build_parser()
     args = parser.parse_args()
 
@@ -229,6 +300,9 @@ def main():
             list_folders()
         elif args.mode == "rename-folder":
             rename_folder(args.folder, args.new_name)
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        sys.exit(130)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

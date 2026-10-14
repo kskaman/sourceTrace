@@ -59,6 +59,14 @@ def test_build_parser_parses_chat_mode_with_custom_results():
     assert args.results == 5
 
 
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_build_parser_rejects_non_positive_results(value):
+    with pytest.raises(SystemExit):
+        rag_cli.build_parser().parse_args(
+            ["chat", "--folder", "policies", "--results", value]
+        )
+
+
 def test_build_parser_parses_delete_folder_mode():
     args = rag_cli.build_parser().parse_args(
         ["delete-folder", "--folder", "policies", "--yes"]
@@ -298,11 +306,43 @@ def test_rename_folder_reports_updated_chunks(monkeypatch, capsys):
 
 
 def test_chat_loop_exits_without_loading_retrieval(monkeypatch, capsys):
+    monkeypatch.setattr(rag_cli, "require_data_folder", lambda _: None)
     monkeypatch.setattr("builtins.input", lambda _: "exit")
 
     rag_cli.chat_loop("policies")
 
     assert "Entering chat mode for folder 'policies'" in capsys.readouterr().out
+
+
+def test_report_trace_does_not_write_when_trace_dir_is_empty(monkeypatch):
+    from src.config import CONFIG
+
+    monkeypatch.setitem(CONFIG, "print_trace", False)
+    monkeypatch.setitem(CONFIG, "trace_dir", "")
+    monkeypatch.setattr(
+        "src.observability.write_trace",
+        lambda *args, **kwargs: pytest.fail("empty TRACE_DIR must disable trace files"),
+    )
+
+    rag_cli.report_trace()
+
+
+def test_chat_loop_rejects_missing_data_folder(monkeypatch):
+    def missing(_):
+        raise ValueError("Data folder 'missing' does not exist")
+
+    monkeypatch.setattr(rag_cli, "require_data_folder", missing)
+
+    with pytest.raises(ValueError, match="does not exist"):
+        rag_cli.chat_loop("missing")
+
+
+@pytest.mark.parametrize("max_results", [0, -1])
+def test_chat_loop_rejects_non_positive_results(monkeypatch, max_results):
+    monkeypatch.setattr(rag_cli, "require_data_folder", lambda _: None)
+
+    with pytest.raises(ValueError, match="positive integer"):
+        rag_cli.chat_loop("policies", max_results=max_results)
 
 
 def test_chat_loop_prints_empty_index_message_and_uses_result_limit(
@@ -319,6 +359,7 @@ def test_chat_loop_prints_empty_index_message_and_uses_result_limit(
             "candidate_count": 0,
         }
 
+    monkeypatch.setattr(rag_cli, "require_data_folder", lambda _: None)
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     rag_cli.chat_loop("policies", max_results=3, answer_fn=fake_answer)

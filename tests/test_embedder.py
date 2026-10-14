@@ -16,6 +16,12 @@ def test_embed_chunks_handles_empty_list():
     assert embedder.embed_chunks([]) == []
 
 
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test_embed_chunks_rejects_non_positive_batch_size(batch_size):
+    with pytest.raises(ValueError, match="batch_size"):
+        embedder.embed_chunks(["text"], batch_size=batch_size)
+
+
 def test_embed_chunks_with_retry_matches_embed_chunks_on_success():
     texts = ["A simple sentence."]
     vectors = embedder.embed_chunks_with_retry(texts, batch_size=64)
@@ -52,3 +58,8 @@ def test_embed_chunks_with_retry_raises_after_max_retries(monkeypatch):
 
     with pytest.raises(RuntimeError):
         embedder.embed_chunks_with_retry(["will fail"], batch_size=64, max_retries=2)
+
+
+def test_embed_chunks_with_retry_rejects_negative_retries():
+    with pytest.raises(ValueError, match="max_retries"):
+        embedder.embed_chunks_with_retry(["text"], max_retries=-1)

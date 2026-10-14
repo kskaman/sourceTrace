@@ -2,21 +2,22 @@
 import psycopg2
 from pgvector.psycopg2 import register_vector
 
+from ..config import CONFIG
+
+
 def get_connection():
-    conn = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        dbname="rag-cli",
-        user="rag-cli",
-        password="rag-cli",
-    )
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')"
-        )
-        vector_is_available = cur.fetchone()[0]
-    if vector_is_available:
-        register_vector(conn)
+    conn = psycopg2.connect(CONFIG["database_url"])
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+            )
+            vector_is_available = cur.fetchone()[0]
+        if vector_is_available:
+            register_vector(conn)
+    except Exception:
+        conn.close()
+        raise
     return conn
 
 
@@ -24,10 +25,10 @@ def create_tables(conn):
     """Create the clean database schema for a new index."""
     with conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-        cur.execute("""
+        cur.execute(f"""
             CREATE TABLE IF NOT EXISTS chunks (
                 id SERIAL PRIMARY KEY,
-                embedding vector(384),
+                embedding vector({CONFIG["embedding_dim"]}),
                 content TEXT NOT NULL,
                 source_file TEXT NOT NULL,
                 file_path TEXT NOT NULL,
@@ -93,6 +94,18 @@ def initialize_database(conn) -> bool:
         return False
     create_tables(conn)
     return True
+
+
+def data_folder_exists(data_folder: str, conn) -> bool:
+    """Return whether an initialized database contains chunks for a folder."""
+    if not database_is_initialized(conn):
+        return False
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT EXISTS(SELECT 1 FROM chunks WHERE data_folder = %s)",
+            (data_folder,),
+        )
+        return cur.fetchone()[0]
 
 
 def delete_data_folder(data_folder: str, conn) -> int:

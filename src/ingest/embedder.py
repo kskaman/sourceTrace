@@ -3,11 +3,17 @@ from sentence_transformers import SentenceTransformer
 import time
 import random
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+from ..config import CONFIG
+
+model = SentenceTransformer(CONFIG["embedding_model"])
 
 
-def embed_chunks(texts: list[str], batch_size: int = 64) -> list[list[float]]:
+def embed_chunks(texts: list[str], batch_size: int | None = None) -> list[list[float]]:
     """Embed a list of texts in batches. Returns list of vectors."""
+    if batch_size is None:
+        batch_size = CONFIG["embed_batch_size"]
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
     all_embeddings = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
@@ -18,10 +24,18 @@ def embed_chunks(texts: list[str], batch_size: int = 64) -> list[list[float]]:
 
 def embed_chunks_with_retry(
     texts: list[str],
-    batch_size: int = 64,
-    max_retries: int = 3,
+    batch_size: int | None = None,
+    max_retries: int | None = None,
 ) -> list[list[float]]:
     """Embed texts in batches with exponential backoff on failure."""
+    if batch_size is None:
+        batch_size = CONFIG["embed_batch_size"]
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+    if max_retries is None:
+        max_retries = CONFIG["embed_max_retries"]
+    if max_retries < 0:
+        raise ValueError("max_retries must be non-negative")
     all_embeddings = []
 
     for i in range(0, len(texts), batch_size):

@@ -1,5 +1,6 @@
 from .database import (
 	create_tables,
+	data_folder_exists,
 	database_is_initialized,
 	delete_data_folder,
 	get_connection,
@@ -11,6 +12,7 @@ from .database import (
 __all__ = [
 	"get_connection",
 	"create_tables",
+	"data_folder_exists",
 	"database_is_initialized",
 	"delete_data_folder",
 	"initialize_database",

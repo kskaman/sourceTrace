@@ -1,4 +1,5 @@
 """Tests for retrieval orchestration and model fallback behavior."""
+import pytest
 
 from src.retrieve import pipeline
 
@@ -30,3 +31,9 @@ def test_answer_returns_message_without_calling_models_when_index_is_empty(
     assert retrieval_calls == [
         ("Where is the policy?", 20, {"data_folder": "policies"})
     ]
+
+
+@pytest.mark.parametrize("k, n", [(0, 1), (-1, 1), (1, 0), (1, -1)])
+def test_answer_rejects_non_positive_limits(k, n):
+    with pytest.raises(ValueError, match="positive integer"):
+        pipeline.answer("question", "policies", k=k, n=n)

@@ -3,6 +3,7 @@ import pytest
 
 from src.database import (
     create_tables,
+    data_folder_exists,
     initialize_database,
     delete_data_folder,
     list_data_folders,
@@ -70,6 +71,17 @@ def test_create_tables_is_idempotent(db_conn):
         cur.execute("SELECT COUNT(*) FROM chunks")
         count = cur.fetchone()[0]
     assert count == 0
+
+
+def test_data_folder_exists_only_when_folder_contains_chunks(corpus_dir, db_conn):
+    from src.ingest.pipeline import ingest_file
+
+    assert data_folder_exists("policies", db_conn) is False
+
+    ingest_file(corpus_dir / "refund_policy.md", db_conn, "policies")
+
+    assert data_folder_exists("policies", db_conn) is True
+    assert data_folder_exists("missing", db_conn) is False
 
 
 def test_initialize_database_skips_creation_when_schema_exists(

@@ -1,4 +1,7 @@
 """Tests for the end-to-end ingestion pipeline in src.ingest.pipeline."""
+import pytest
+
+from src.ingest import pipeline
 from src.ingest.pipeline import (
     check_document_status,
     compute_file_hash,
@@ -56,6 +59,35 @@ def test_ingest_file_skips_file_with_no_extractable_text(tmp_path, db_conn):
     result = ingest_file(empty_file, db_conn, "empty-files")
 
     assert result["status"] == "skipped"
+
+
+def test_ingest_file_rejects_missing_embeddings(tmp_path, db_conn, monkeypatch):
+    file_path = tmp_path / "policy.md"
+    file_path.write_text("Content that is long enough to retain.", encoding="utf-8")
+    monkeypatch.setattr(pipeline, "embed_chunks_with_retry", lambda chunks: [])
+
+    with pytest.raises(RuntimeError, match="Embedding count mismatch"):
+        ingest_file(file_path, db_conn, "policies")
+
+    db_conn.rollback()
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM chunks")
+        assert cur.fetchone()[0] == 0
+
+
+def test_ingest_file_rejects_wrong_embedding_dimension(
+    tmp_path, db_conn, monkeypatch
+):
+    file_path = tmp_path / "policy.md"
+    file_path.write_text("Content that is long enough to retain.", encoding="utf-8")
+    monkeypatch.setattr(
+        pipeline,
+        "embed_chunks_with_retry",
+        lambda chunks: [[0.0] * 3 for _ in chunks],
+    )
+
+    with pytest.raises(RuntimeError, match="Embedding dimension mismatch"):
+        ingest_file(file_path, db_conn, "policies")
 
 
 def test_check_document_status_reports_new_unchanged_and_changed(corpus_dir, db_conn):
@@ -137,3 +169,30 @@ def test_ingest_file_idempotent_reingests_changed_file(tmp_path, db_conn):
 
     assert len(rows) == second["chunks"]
     assert any("Updated content" in r[0] for r in rows)
+
+
+def test_failed_reingestion_preserves_previous_chunks(tmp_path, db_conn, monkeypatch):
+    file_path = tmp_path / "policy.md"
+    original = "Original content that is long enough to keep."
+    file_path.write_text(original, encoding="utf-8")
+    ingest_file_idempotent(file_path, db_conn, "policies")
+
+    file_path.write_text("Updated content that fails embedding.", encoding="utf-8")
+    monkeypatch.setattr(
+        pipeline,
+        "embed_chunks_with_retry",
+        lambda chunks: (_ for _ in ()).throw(RuntimeError("embedding failed")),
+    )
+
+    with pytest.raises(RuntimeError, match="embedding failed"):
+        ingest_file_idempotent(file_path, db_conn, "policies")
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT content FROM chunks WHERE source_file = %s AND data_folder = %s",
+            (file_path.name, "policies"),
+        )
+        rows = cur.fetchall()
+
+    assert rows
+    assert all(original in row[0] for row in rows)

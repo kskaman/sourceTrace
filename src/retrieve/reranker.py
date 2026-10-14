@@ -1,8 +1,10 @@
 # reranker.py - Cross-encoder reranking with BAAI/bge-reranker-v2-m3
 from sentence_transformers import CrossEncoder
 
+from ..config import CONFIG
+
 # Loaded once on import. First run downloads the model (~600 MB).
-_model = CrossEncoder("BAAI/bge-reranker-v2-m3")
+_model = CrossEncoder(CONFIG["reranker_model"])
 
 
 def rerank(query: str, candidates: list[dict], top_n: int = 5) -> list[dict]:

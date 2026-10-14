@@ -8,12 +8,24 @@ from datetime import datetime, timezone
 from .document_parser import parse_document
 from .text_cleaner import clean_text
 from .embedder import embed_chunks_with_retry
+from ..config import CONFIG
+from ..observability import span
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def recursive_split(text, chunk_size=512, overlap=50):
+def recursive_split(text, chunk_size=None, overlap=None):
     """Simple recursive character splitter (from chapter 3)."""
+    if chunk_size is None:
+        chunk_size = CONFIG["chunk_size"]
+    if overlap is None:
+        overlap = CONFIG["chunk_overlap"]
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    if overlap < 0:
+        raise ValueError("overlap must be non-negative")
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be smaller than chunk_size")
     separators = ["\n\n", "\n", ". ", " "]
 
     if len(text) <= chunk_size:
@@ -38,7 +50,13 @@ def recursive_split(text, chunk_size=512, overlap=50):
             chunks.append(current.strip())
 
         if chunks:
-            return chunks
+            bounded_chunks = []
+            for chunk in chunks:
+                if len(chunk) > chunk_size:
+                    bounded_chunks.extend(recursive_split(chunk, chunk_size, overlap))
+                else:
+                    bounded_chunks.append(chunk)
+            return bounded_chunks
 
     # Fallback: hard split
     chunks = []
@@ -61,67 +79,90 @@ def compute_file_hash(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
-def ingest_file(file_path: Path, conn, data_folder: str) -> dict:
+def ingest_file(
+    file_path: Path,
+    conn,
+    data_folder: str,
+    *,
+    commit: bool = True,
+    doc_hash: str | None = None,
+) -> dict:
     """Process a single file through the full pipeline."""
     file_path = Path(file_path)
     logger.info(f"Processing: {file_path.name}")
 
     # Step 1: Parse
-    parsed = parse_document(file_path)
+    with span("ingest.parse", file=file_path.name):
+        parsed = parse_document(file_path)
     if not parsed.text.strip():
         logger.warning(f"Skipping {file_path.name}: no text extracted")
         return {"file": file_path.name, "status": "skipped", "reason": "empty"}
 
     # Step 2: Clean
-    cleaned_text = clean_text(parsed.text)
+    with span("ingest.clean", input_chars=len(parsed.text)):
+        cleaned_text = clean_text(parsed.text)
     if not cleaned_text:
         logger.warning(f"Skipping {file_path.name}: empty after cleaning")
         return {"file": file_path.name, "status": "skipped", "reason": "empty_after_clean"}
 
     # Step 3: Chunk
-    chunks = recursive_split(cleaned_text, chunk_size=512, overlap=50)
+    with span("ingest.chunk", input_chars=len(cleaned_text)):
+        chunks = recursive_split(cleaned_text)
     if not chunks:
         logger.warning(f"Skipping {file_path.name}: no chunks produced")
         return {"file": file_path.name, "status": "skipped", "reason": "no_chunks"}
 
     # Step 4: Embed (batched)
-    embeddings = embed_chunks_with_retry(chunks, batch_size=64)
+    with span("ingest.embed", chunk_count=len(chunks), batch_size=CONFIG["embed_batch_size"]):
+        embeddings = embed_chunks_with_retry(chunks)
+    if len(embeddings) != len(chunks):
+        raise RuntimeError(
+            f"Embedding count mismatch: expected {len(chunks)}, got {len(embeddings)}"
+        )
+    for index, embedding in enumerate(embeddings):
+        if len(embedding) != CONFIG["embedding_dim"]:
+            raise RuntimeError(
+                f"Embedding dimension mismatch for chunk {index}: "
+                f"expected {CONFIG['embedding_dim']}, got {len(embedding)}"
+            )
 
     # Step 5: Store
-    doc_hash = compute_file_hash(file_path)
+    doc_hash = doc_hash or compute_file_hash(file_path)
     now = datetime.now(timezone.utc)
 
     meta = parsed.metadata
-    with conn.cursor() as cur:
-        for idx, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
-            cur.execute(
-                """
-                INSERT INTO chunks
-                    (embedding, content, source_file, file_path, doc_type,
-                     chunk_index, total_chunks, doc_hash,
-                     title, category, last_updated, owner, classification,
-                     data_folder, ingested_at)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    embedding,
-                    chunk_text,
-                    meta["source"],
-                    meta["file_path"],
-                    meta["doc_type"],
-                    idx,
-                    len(chunks),
-                    doc_hash,
-                    meta.get("title"),
-                    meta.get("category"),
-                    meta.get("last_updated"),
-                    meta.get("owner"),
-                    meta.get("classification"),
-                    data_folder,
-                    now,
-                ),
-            )
-    conn.commit()
+    with span("ingest.store", chunk_count=len(chunks)):
+        with conn.cursor() as cur:
+            for idx, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+                cur.execute(
+                    """
+                    INSERT INTO chunks
+                        (embedding, content, source_file, file_path, doc_type,
+                         chunk_index, total_chunks, doc_hash,
+                         title, category, last_updated, owner, classification,
+                         data_folder, ingested_at)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        embedding,
+                        chunk_text,
+                        meta["source"],
+                        meta["file_path"],
+                        meta["doc_type"],
+                        idx,
+                        len(chunks),
+                        doc_hash,
+                        meta.get("title"),
+                        meta.get("category"),
+                        meta.get("last_updated"),
+                        meta.get("owner"),
+                        meta.get("classification"),
+                        data_folder,
+                        now,
+                    ),
+                )
+        if commit:
+            conn.commit()
 
     logger.info(
         f"Ingested {file_path.name}: {len(chunks)} chunks, "
@@ -181,6 +222,29 @@ def ingest_file_idempotent(file_path: Path, conn, data_folder: str) -> dict:
 
     if status == "changed":
         logger.info(f"Re-ingesting {file_path.name}: content changed")
-        delete_document_chunks(file_path.name, conn, data_folder)
+        try:
+            result = ingest_file(
+                file_path,
+                conn,
+                data_folder,
+                commit=False,
+                doc_hash=doc_hash,
+            )
+            if result["status"] != "success":
+                conn.rollback()
+                return result
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM chunks
+                    WHERE source_file = %s AND data_folder = %s AND doc_hash <> %s
+                    """,
+                    (file_path.name, data_folder, doc_hash),
+                )
+            conn.commit()
+            return result
+        except Exception:
+            conn.rollback()
+            raise
 
     return ingest_file(file_path, conn, data_folder)

@@ -1,20 +1,11 @@
 # query_transform.py - LLM-based query rewriting, HyDE, multi-query, decomposition
-import os
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
-
-from dotenv import load_dotenv
-#from openai import OpenAI
 from ollama import Client
 
-load_dotenv()
-#client = OpenAI()
-ollama_client = Client()
+from ..config import CONFIG
 
-#LLM_MODEL = "gpt-4o-mini"
-LLM_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+ollama_client = Client(host=CONFIG["ollama_host"])
+
+LLM_MODEL = CONFIG["llm_model"]
 
 def _chat(prompt: str) -> str:
     # response = client.chat.completions.create(

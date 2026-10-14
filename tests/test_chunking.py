@@ -1,4 +1,6 @@
 """Tests for the recursive_split chunker in src.ingest.pipeline."""
+import pytest
+
 from src.ingest.pipeline import recursive_split
 
 
@@ -34,6 +36,24 @@ def test_recursive_split_respects_chunk_size_for_long_unsplittable_text():
     for chunk in chunks:
         assert len(chunk) <= 512
     assert "".join(chunks).replace("a", "") == ""  # all chunks are just "a"s
+
+
+def test_recursive_split_resplits_oversized_separator_parts():
+    text = ("a" * 700) + ". short sentence"
+
+    chunks = recursive_split(text, chunk_size=512, overlap=50)
+
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 512 for chunk in chunks)
+
+
+@pytest.mark.parametrize(
+    "chunk_size, overlap",
+    [(0, 0), (-1, 0), (10, -1), (10, 10)],
+)
+def test_recursive_split_rejects_invalid_sizes(chunk_size, overlap):
+    with pytest.raises(ValueError):
+        recursive_split("text", chunk_size=chunk_size, overlap=overlap)
 
 
 def test_recursive_split_hard_fallback_produces_overlapping_chunks():
