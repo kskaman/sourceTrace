@@ -94,6 +94,8 @@ postgresql://rag-cli:rag-cli@localhost:5433/sourceTraceTest
 
 Set `TEST_DATABASE_URL` only when another isolated test database is required. It must not point to the application database because database tests clear their own `chunks` table between cases.
 
+Parser and ingestion tests use four small synthetic fixtures in `tests/data/corpus/`: one Markdown, HTML, DOCX, and PDF document.
+
 ## Observability
 
 - `PRINT_TRACE=true` prints per-request stage and latency summaries.

@@ -49,7 +49,7 @@ CORPUS_DIR = Path(__file__).resolve().parent / "data" / "corpus"
 
 @pytest.fixture(scope="session")
 def corpus_dir() -> Path:
-    """Path to the sample documents used by the tests."""
+    """Path to the synthetic documents used by parser and ingestion tests."""
     return CORPUS_DIR
 
 
@@ -58,14 +58,17 @@ def db_conn():
     """A connection to the test Postgres database, with the chunks table emptied.
 
     Skips any test that uses this fixture if Postgres isn't reachable
-    (start it with `docker compose up -d pgvector`).
+    (start it with `docker compose up -d pgvector-test`).
     """
     from src.database import create_tables, get_connection
 
     try:
         conn = get_connection()
     except Exception as exc:
-        pytest.skip(f"Postgres is not reachable (run `docker compose up -d pgvector`): {exc}")
+        pytest.skip(
+            "Test Postgres is not reachable "
+            f"(run `docker compose up -d pgvector-test`): {exc}"
+        )
 
     create_tables(conn)
     with conn.cursor() as cur:
