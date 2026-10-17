@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  push:
+    branches: [baseline]
+  pull_request:
+    branches: [baseline]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      pgvector:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rag-cli
+          POSTGRES_PASSWORD: rag-cli
+          POSTGRES_DB: sourceTraceTest
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U rag-cli -d sourceTraceTest"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgresql://rag-cli:rag-cli@localhost:5433/sourceTraceTest
+      HF_HUB_DISABLE_TELEMETRY: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache Hugging Face models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: ${{ runner.os }}-huggingface-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest -q
