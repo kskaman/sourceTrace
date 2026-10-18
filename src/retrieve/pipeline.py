@@ -4,6 +4,7 @@ import logging
 from ollama import Client
 
 from .hybrid import hybrid_candidates
+from .parent import expand_to_parent_context
 from ..config import CONFIG
 from ..observability import log_event, new_trace, span
 
@@ -139,6 +140,7 @@ def answer(
         data_folder=data_folder,
         k=k,
         n=n,
+        parent_chunk_radius=CONFIG["parent_chunk_radius"],
         use_reranker=use_reranker,
         embedding_model=CONFIG["embedding_model"],
         reranker_model=CONFIG["reranker_model"],
@@ -168,6 +170,17 @@ def answer(
         chunks = select_context(
             candidates, n=n, use_reranker=use_reranker, query=retrieval_query
         )
+    with span(
+        "retrieval.parent_context",
+        child_count=len(chunks),
+        radius=CONFIG["parent_chunk_radius"],
+    ):
+        chunks = expand_to_parent_context(
+            chunks,
+            data_folder,
+            radius=CONFIG["parent_chunk_radius"],
+        )
+    log_event("retrieval.parent_context.result", context_count=len(chunks))
     prompt = build_prompt(question, chunks)
     # response = client.chat.completions.create(
     #     model=JUDGE_MODEL,

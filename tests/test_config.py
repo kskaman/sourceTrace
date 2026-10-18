@@ -14,6 +14,7 @@ VALID_ENV = {
     "OLLAMA_MODEL": "llama3.2:3b",
     "CANDIDATE_K": "50",
     "CONTEXT_N": "10",
+    "PARENT_CHUNK_RADIUS": "2",
     "USE_RERANKER": "true",
     "USE_QUERY_TRANSFORM": "no",
     "CHUNK_SIZE": "512",
@@ -32,6 +33,7 @@ def test_build_config_parses_every_value():
     cfg = build_config(VALID_ENV)
 
     assert cfg["candidate_k"] == 50
+    assert cfg["parent_chunk_radius"] == 2
     assert cfg["embed_max_retries"] == 0
     assert cfg["use_reranker"] is True
     assert cfg["use_query_transform"] is False
@@ -59,6 +61,7 @@ def test_every_variable_is_required(name):
         ("EMBEDDING_DIM", "0"),
         ("CANDIDATE_K", "ten"),
         ("CONTEXT_N", "-1"),
+        ("PARENT_CHUNK_RADIUS", "-1"),
         ("CHUNK_OVERLAP", "-5"),
         ("EMBED_MAX_RETRIES", "1.5"),
         ("USE_RERANKER", "maybe"),

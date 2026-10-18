@@ -110,6 +110,9 @@ def build_config(env: Mapping[str, str] | None = None) -> dict:
         "llm_model": get("OLLAMA_MODEL"),
         "candidate_k": get("CANDIDATE_K", _positive_int, _EXPECT_POSITIVE_INT),
         "context_n": get("CONTEXT_N", _positive_int, _EXPECT_POSITIVE_INT),
+        "parent_chunk_radius": get(
+            "PARENT_CHUNK_RADIUS", _non_negative_int, _EXPECT_NON_NEGATIVE_INT
+        ),
         "chunk_size": get("CHUNK_SIZE", _positive_int, _EXPECT_POSITIVE_INT),
         "chunk_overlap": get("CHUNK_OVERLAP", _non_negative_int, _EXPECT_NON_NEGATIVE_INT),
         "embed_batch_size": get("EMBED_BATCH_SIZE", _positive_int, _EXPECT_POSITIVE_INT),

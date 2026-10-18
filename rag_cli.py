@@ -91,7 +91,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--results",
         type=positive_int,
         default=CONFIG["context_n"],
-        help=f"Maximum retrieved chunks per question (default: CONTEXT_N={CONFIG['context_n']}).",
+        help=(
+            "Maximum child hits before parent-context expansion "
+            f"(default: CONTEXT_N={CONFIG['context_n']})."
+        ),
     )
 
     delete_parser = subparsers.add_parser(

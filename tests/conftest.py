@@ -30,6 +30,7 @@ os.environ.update(
         "OLLAMA_MODEL": "llama3.2:3b",
         "CANDIDATE_K": "20",
         "CONTEXT_N": "10",
+		"PARENT_CHUNK_RADIUS": "2",
         "USE_RERANKER": "true",
         "USE_QUERY_TRANSFORM": "false",
         "CHUNK_SIZE": "512",

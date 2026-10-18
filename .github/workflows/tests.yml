@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [baseline]
+    branches: [parent-document-retrieval]
   pull_request:
-    branches: [baseline]
+    branches: [parent-document-retrieval]
 
 permissions:
   contents: read

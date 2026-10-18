@@ -57,6 +57,14 @@ The database schema is created automatically on first ingestion. Reingestion is 
 
 Data folders are logical namespaces in PostgreSQL. Source files are not copied or renamed, and the reserved folder name `default` is rejected.
 
+## Retrieval
+
+Retrieval uses the parent-document pattern. Hybrid keyword and semantic search ranks the small chunks stored during ingestion. After reranking, each selected child chunk is expanded to include `PARENT_CHUNK_RADIUS` chunks before and after it from the same document and data folder. This setting is independent of `CHUNK_OVERLAP`, which controls ingestion-time text splitting.
+
+Overlapping or adjacent parent windows from the same document are merged into one extended range. Every unique chunk in the merged ranges is sent to Ollama once, in document order, with its exact chunk-level citation.
+
+`CONTEXT_N` and `chat --results` limit the number of precise child hits selected before expansion, not the final number of context chunks. The final context can be larger after expansion or smaller than the theoretical maximum after deduplication. The pipeline does not run another search to fill space created by deduplication; doing so would change the meaning of the selected child-hit limit and can add lower-relevance context.
+
 ## Usage
 
 ```powershell

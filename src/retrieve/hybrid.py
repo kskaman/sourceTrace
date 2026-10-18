@@ -42,7 +42,7 @@ def keyword_search(query: str, k: int = 20, filters: dict | None = None) -> list
         where += " AND " + filter_sql
 
     sql = f"""
-        SELECT id, content, source_file, doc_type, category, chunk_index, page_number,
+        SELECT id, content, source_file, file_path, doc_type, category, chunk_index, page_number,
                ts_rank_cd(search_vector, websearch_to_tsquery('english', %s)) AS score
         FROM chunks
         WHERE {where}
@@ -58,12 +58,13 @@ def keyword_search(query: str, k: int = 20, filters: dict | None = None) -> list
             "chunk_id": row[0],
             "content": row[1],
             "source_file": row[2],
-            "doc_type": row[3],
-            "category": row[4],
-            "chunk_index": row[5],
-            "page_number": row[6],
+            "file_path": row[3],
+            "doc_type": row[4],
+            "category": row[5],
+            "chunk_index": row[6],
+            "page_number": row[7],
             "keyword_rank": rank + 1,
-            "keyword_score": float(row[7]),
+            "keyword_score": float(row[8]),
             "semantic_rank": None,
             "semantic_score": None,
             "matched_by": "keyword",
@@ -81,7 +82,7 @@ def semantic_search(query: str, k: int = 20, filters: dict | None = None) -> lis
     where = ("WHERE " + filter_sql) if filter_sql else ""
 
     sql = f"""
-        SELECT id, content, source_file, doc_type, category, chunk_index, page_number,
+        SELECT id, content, source_file, file_path, doc_type, category, chunk_index, page_number,
                1 - (embedding <=> %s::vector) AS score
         FROM chunks
         {where}
@@ -97,14 +98,15 @@ def semantic_search(query: str, k: int = 20, filters: dict | None = None) -> lis
             "chunk_id": row[0],
             "content": row[1],
             "source_file": row[2],
-            "doc_type": row[3],
-            "category": row[4],
-            "chunk_index": row[5],
-            "page_number": row[6],
+            "file_path": row[3],
+            "doc_type": row[4],
+            "category": row[5],
+            "chunk_index": row[6],
+            "page_number": row[7],
             "keyword_rank": None,
             "keyword_score": None,
             "semantic_rank": rank + 1,
-            "semantic_score": float(row[7]),
+            "semantic_score": float(row[8]),
             "matched_by": "semantic",
         }
         for rank, row in enumerate(rows)

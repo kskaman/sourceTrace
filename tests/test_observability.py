@@ -66,6 +66,11 @@ def test_answer_emits_stage_events(monkeypatch):
         }
     ]
     monkeypatch.setattr(pipeline, "hybrid_candidates", lambda q, k, filters: candidates)
+    monkeypatch.setattr(
+        pipeline,
+        "expand_to_parent_context",
+        lambda children, data_folder, radius: children,
+    )
 
     class FakeResponse:
         class message:
@@ -84,6 +89,8 @@ def test_answer_emits_stage_events(monkeypatch):
         "retrieval.hybrid",
         "retrieval.candidates",
         "selection.context",
+        "retrieval.parent_context",
+        "retrieval.parent_context.result",
         "generation.llm",
         "generation.complete",
     } <= set(stages)
