@@ -18,8 +18,8 @@ jobs:
       pgvector:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: rag-cli
-          POSTGRES_PASSWORD: rag-cli
+          POSTGRES_USER: rag-cli-parent-document
+          POSTGRES_PASSWORD: rag-cli-parent-document
           POSTGRES_DB: sourceTraceTest
         ports:
           - 5433:5432
