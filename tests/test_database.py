@@ -23,7 +23,7 @@ def test_create_tables_creates_chunks_table_with_expected_columns(db_conn):
         "id", "embedding", "content", "source_file", "file_path", "doc_type",
         "chunk_index", "total_chunks", "doc_hash", "title", "category",
         "last_updated", "owner", "classification", "page_number", "ingested_at",
-        "search_vector", "data_folder",
+        "search_vector", "data_folder", "context_prefix", "index_profile",
     }
     assert expected.issubset(columns)
 
@@ -73,6 +73,38 @@ def test_create_tables_is_idempotent(db_conn):
     assert count == 0
 
 
+def test_create_tables_migrates_baseline_search_vector(db_conn):
+    with db_conn.cursor() as cur:
+        cur.execute("DROP INDEX IF EXISTS chunks_search_vector_idx")
+        cur.execute("ALTER TABLE chunks DROP COLUMN search_vector")
+        cur.execute(
+            """
+            ALTER TABLE chunks ADD COLUMN search_vector TSVECTOR
+            GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
+            """
+        )
+    db_conn.commit()
+
+    create_tables(db_conn)
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT pg_get_expr(definition.adbin, definition.adrelid)
+            FROM pg_attribute attribute
+            JOIN pg_class relation ON relation.oid = attribute.attrelid
+            JOIN pg_attrdef definition
+              ON definition.adrelid = relation.oid
+             AND definition.adnum = attribute.attnum
+            WHERE relation.relname = 'chunks'
+              AND attribute.attname = 'search_vector'
+            """
+        )
+        expression = cur.fetchone()[0]
+
+    assert "context_prefix" in expression
+
+
 def test_data_folder_exists_only_when_folder_contains_chunks(corpus_dir, db_conn):
     from src.ingest.pipeline import ingest_file
 
@@ -84,7 +116,7 @@ def test_data_folder_exists_only_when_folder_contains_chunks(corpus_dir, db_conn
     assert data_folder_exists("missing", db_conn) is False
 
 
-def test_initialize_database_skips_creation_when_schema_exists(
+def test_initialize_database_ensures_schema_when_table_exists(
     monkeypatch, db_conn
 ):
     create_calls = []
@@ -96,7 +128,35 @@ def test_initialize_database_skips_creation_when_schema_exists(
     was_created = initialize_database(db_conn)
 
     assert was_created is False
-    assert create_calls == []
+    assert create_calls == [db_conn]
+
+
+def test_search_vector_indexes_context_prefix_and_raw_content(db_conn):
+    with db_conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO chunks (
+                embedding, content, context_prefix, source_file, file_path,
+                doc_type, chunk_index, total_chunks, doc_hash, data_folder
+            ) VALUES (
+                array_fill(0, ARRAY[384])::vector, 'refund timing',
+                'European customer policy', 'source.md', 'source.md',
+                'md', 0, 1, 'hash', 'policies'
+            )
+            """
+        )
+        cur.execute(
+            """
+            SELECT
+                search_vector @@ plainto_tsquery('english', 'European'),
+                search_vector @@ plainto_tsquery('english', 'refund')
+            FROM chunks
+            """
+        )
+        prefix_match, content_match = cur.fetchone()
+
+    assert prefix_match is True
+    assert content_match is True
 
 
 def test_delete_data_folder_removes_only_selected_folder(corpus_dir, db_conn):

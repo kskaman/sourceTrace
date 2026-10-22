@@ -37,7 +37,7 @@ ollama serve
 ollama pull llama3.2:3b
 ```
 
-The defaults use `http://localhost:11434` for Ollama. All application settings in `.env` are validated at startup. `TRACE_DIR` must be defined but may be empty to disable trace files.
+The defaults use `http://localhost:11434` for Ollama and use the same local model for contextual indexing and answer generation. Pull `CONTEXTUAL_MODEL` separately if it differs from `OLLAMA_MODEL`. All application settings in `.env` are validated at startup. `TRACE_DIR` must be defined but may be empty to disable trace files.
 
 ## Ingestion
 
@@ -50,10 +50,15 @@ Supported document types are Markdown, HTML, DOCX, PDF, and plain text. Ingestio
 1. Parse document text and metadata.
 2. Normalize text and remove common boilerplate.
 3. Split text into chunks no larger than `CHUNK_SIZE`.
-4. Create one embedding per chunk and validate its configured dimension.
-5. Store chunks, embeddings, and metadata in PostgreSQL.
+4. When `USE_CONTEXTUAL_RETRIEVAL=true`, use Ollama to summarize the bounded parent document once and generate a concise context prefix for each chunk.
+5. Embed each context prefix together with its raw chunk and validate the configured dimension.
+6. Store the raw chunk, context prefix, embedding, and metadata in PostgreSQL.
 
-The database schema is created automatically on first ingestion. Reingestion is idempotent: unchanged files are skipped, while changed files are replaced atomically. New chunks are stored and old chunks are removed in one transaction; if replacement fails, the previous indexed document remains available.
+Contextual prefixes improve semantic search, PostgreSQL keyword search, and cross-encoder reranking. They are not included in answer context or citations: Ollama receives the original chunk text after retrieval. Indexing makes one contextual-summary model call per document plus one call per chunk, so ingestion is slower than baseline indexing.
+
+`CONTEXTUAL_MAX_DOCUMENT_CHARS` bounds the document text sent for summary generation. Long documents use their head and tail within that limit. Contextualization is deterministic (`temperature=0`) and fails the file transaction if Ollama returns an error or empty output, preventing a partially contextualized index.
+
+The database schema is created or migrated automatically on ingestion. Reingestion is idempotent: unchanged files with the same index profile are skipped, while changed files or contextual-index settings are replaced atomically. New chunks are stored and old chunks are removed in one transaction; if replacement fails, the previous indexed document remains available.
 
 Data folders are logical namespaces in PostgreSQL. Source files are not copied or renamed, and the reserved folder name `default` is rejected.
 

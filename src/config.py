@@ -116,6 +116,13 @@ def build_config(env: Mapping[str, str] | None = None) -> dict:
         "embed_max_retries": get("EMBED_MAX_RETRIES", _non_negative_int, _EXPECT_NON_NEGATIVE_INT),
         "use_reranker": get("USE_RERANKER", _bool, _EXPECT_BOOL),
         "use_query_transform": get("USE_QUERY_TRANSFORM", _bool, _EXPECT_BOOL),
+        "use_contextual_retrieval": get(
+            "USE_CONTEXTUAL_RETRIEVAL", _bool, _EXPECT_BOOL
+        ),
+        "contextual_model": get("CONTEXTUAL_MODEL"),
+        "contextual_max_document_chars": get(
+            "CONTEXTUAL_MAX_DOCUMENT_CHARS", _positive_int, _EXPECT_POSITIVE_INT
+        ),
         "print_trace": get("PRINT_TRACE", _bool, _EXPECT_BOOL),
         "trace_dir": get("TRACE_DIR", expected="a directory path (may be empty)", allow_empty=True),
         "force_reranker_failure": get("FORCE_RERANKER_FAILURE", _bool, _EXPECT_BOOL),

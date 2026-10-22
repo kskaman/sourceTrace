@@ -44,11 +44,47 @@ def create_tables(conn):
                 data_folder TEXT NOT NULL CONSTRAINT chunks_data_folder_valid
                     CHECK (btrim(data_folder) <> '' AND lower(data_folder) <> 'default'),
                 page_number INTEGER,
+                context_prefix TEXT,
+                index_profile TEXT NOT NULL DEFAULT 'baseline',
                 ingested_at TIMESTAMP DEFAULT NOW(),
                 search_vector TSVECTOR GENERATED ALWAYS AS (
-                    to_tsvector('english', content)
+                    to_tsvector(
+                        'english', coalesce(context_prefix, '') || ' ' || content
+                    )
                 ) STORED
             );
+        """)
+        cur.execute("""
+            ALTER TABLE chunks
+                ADD COLUMN IF NOT EXISTS context_prefix TEXT,
+                ADD COLUMN IF NOT EXISTS index_profile TEXT NOT NULL DEFAULT 'baseline';
+        """)
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM pg_attribute attribute
+                    JOIN pg_class relation ON relation.oid = attribute.attrelid
+                    JOIN pg_attrdef definition
+                      ON definition.adrelid = relation.oid
+                     AND definition.adnum = attribute.attnum
+                    WHERE relation.relname = 'chunks'
+                      AND attribute.attname = 'search_vector'
+                      AND pg_get_expr(definition.adbin, definition.adrelid)
+                          LIKE '%context_prefix%'
+                ) THEN
+                    DROP INDEX IF EXISTS chunks_search_vector_idx;
+                    ALTER TABLE chunks DROP COLUMN IF EXISTS search_vector;
+                    ALTER TABLE chunks ADD COLUMN search_vector TSVECTOR
+                        GENERATED ALWAYS AS (
+                            to_tsvector(
+                                'english', coalesce(context_prefix, '') || ' ' || content
+                            )
+                        ) STORED;
+                END IF;
+            END
+            $$;
         """)
         # Index for vector search
         cur.execute("""
@@ -89,11 +125,10 @@ def database_is_initialized(conn) -> bool:
 
 
 def initialize_database(conn) -> bool:
-    """Create the schema on first ingestion and report whether it was created."""
-    if database_is_initialized(conn):
-        return False
+    """Create or migrate the schema and report whether it was newly created."""
+    already_initialized = database_is_initialized(conn)
     create_tables(conn)
-    return True
+    return not already_initialized
 
 
 def data_folder_exists(data_folder: str, conn) -> bool:

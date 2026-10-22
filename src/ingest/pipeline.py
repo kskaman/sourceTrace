@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from .document_parser import parse_document
 from .text_cleaner import clean_text
 from .embedder import embed_chunks_with_retry
+from .contextualizer import generate_context_prefixes
 from ..config import CONFIG
 from ..observability import span
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -79,6 +80,16 @@ def compute_file_hash(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
+def current_index_profile() -> str:
+    """Identify settings that require indexed chunks to be regenerated."""
+    if not CONFIG["use_contextual_retrieval"]:
+        return "baseline"
+    return (
+        f"contextual-v1:{CONFIG['contextual_model']}:"
+        f"{CONFIG['contextual_max_document_chars']}"
+    )
+
+
 def ingest_file(
     file_path: Path,
     conn,
@@ -112,9 +123,27 @@ def ingest_file(
         logger.warning(f"Skipping {file_path.name}: no chunks produced")
         return {"file": file_path.name, "status": "skipped", "reason": "no_chunks"}
 
-    # Step 4: Embed (batched)
+    # Step 4: Contextualize and embed (batched)
+    if CONFIG["use_contextual_retrieval"]:
+        with span(
+            "ingest.contextualize",
+            chunk_count=len(chunks),
+            model=CONFIG["contextual_model"],
+        ):
+            context_prefixes = generate_context_prefixes(
+                cleaned_text,
+                chunks,
+                parsed.metadata,
+            )
+    else:
+        context_prefixes = [None] * len(chunks)
+
+    retrieval_texts = [
+        f"{prefix}\n\n{chunk}" if prefix else chunk
+        for prefix, chunk in zip(context_prefixes, chunks)
+    ]
     with span("ingest.embed", chunk_count=len(chunks), batch_size=CONFIG["embed_batch_size"]):
-        embeddings = embed_chunks_with_retry(chunks)
+        embeddings = embed_chunks_with_retry(retrieval_texts)
     if len(embeddings) != len(chunks):
         raise RuntimeError(
             f"Embedding count mismatch: expected {len(chunks)}, got {len(embeddings)}"
@@ -133,19 +162,24 @@ def ingest_file(
     meta = parsed.metadata
     with span("ingest.store", chunk_count=len(chunks)):
         with conn.cursor() as cur:
-            for idx, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
+            for idx, (chunk_text, context_prefix, embedding) in enumerate(
+                zip(chunks, context_prefixes, embeddings)
+            ):
                 cur.execute(
                     """
                     INSERT INTO chunks
-                        (embedding, content, source_file, file_path, doc_type,
+                        (embedding, content, context_prefix, index_profile,
+                         source_file, file_path, doc_type,
                          chunk_index, total_chunks, doc_hash,
                          title, category, last_updated, owner, classification,
                          data_folder, ingested_at)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         embedding,
                         chunk_text,
+                        context_prefix,
+                        current_index_profile(),
                         meta["source"],
                         meta["file_path"],
                         meta["doc_type"],
@@ -183,17 +217,16 @@ def check_document_status(
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT doc_hash FROM chunks
+            SELECT DISTINCT doc_hash, index_profile FROM chunks
             WHERE source_file = %s AND data_folder = %s
-            LIMIT 1
             """,
             (file_path.name, data_folder),
         )
-        row = cur.fetchone()
+        versions = cur.fetchall()
 
-    if row is None:
+    if not versions:
         return "new"
-    elif row[0] == doc_hash:
+    elif versions == [(doc_hash, current_index_profile())]:
         return "unchanged"
     else:
         return "changed"
@@ -213,38 +246,53 @@ def ingest_file_idempotent(file_path: Path, conn, data_folder: str) -> dict:
     """Ingest a file with idempotency checks."""
     file_path = Path(file_path)
     doc_hash = compute_file_hash(file_path)
+    lock_key = f"{len(data_folder)}:{data_folder}{file_path.name}"
 
-    status = check_document_status(file_path, doc_hash, conn, data_folder)
-
-    if status == "unchanged":
-        logger.info(f"Skipping {file_path.name}: unchanged (hash match)")
-        return {"file": file_path.name, "status": "skipped", "reason": "unchanged"}
-
-    if status == "changed":
-        logger.info(f"Re-ingesting {file_path.name}: content changed")
-        try:
-            result = ingest_file(
-                file_path,
-                conn,
-                data_folder,
-                commit=False,
-                doc_hash=doc_hash,
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (lock_key,),
             )
-            if result["status"] != "success":
-                conn.rollback()
-                return result
+
+        status = check_document_status(file_path, doc_hash, conn, data_folder)
+        if status == "unchanged":
+            logger.info(f"Skipping {file_path.name}: unchanged (hash and index profile match)")
+            conn.commit()
+            return {"file": file_path.name, "status": "skipped", "reason": "unchanged"}
+
+        if status == "changed":
+            logger.info(f"Re-ingesting {file_path.name}: content or index profile changed")
+
+        result = ingest_file(
+            file_path,
+            conn,
+            data_folder,
+            commit=False,
+            doc_hash=doc_hash,
+        )
+        if result["status"] != "success":
+            conn.rollback()
+            return result
+
+        if status == "changed":
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     DELETE FROM chunks
-                    WHERE source_file = %s AND data_folder = %s AND doc_hash <> %s
+                    WHERE source_file = %s
+                      AND data_folder = %s
+                      AND (doc_hash <> %s OR index_profile <> %s)
                     """,
-                    (file_path.name, data_folder, doc_hash),
+                    (
+                        file_path.name,
+                        data_folder,
+                        doc_hash,
+                        current_index_profile(),
+                    ),
                 )
-            conn.commit()
-            return result
-        except Exception:
-            conn.rollback()
-            raise
-
-    return ingest_file(file_path, conn, data_folder)
+        conn.commit()
+        return result
+    except Exception:
+        conn.rollback()
+        raise

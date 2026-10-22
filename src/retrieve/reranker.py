@@ -12,7 +12,13 @@ def rerank(query: str, candidates: list[dict], top_n: int = 5) -> list[dict]:
     if not candidates:
         return []
 
-    pairs = [(query, c["content"]) for c in candidates]
+    pairs = []
+    for candidate in candidates:
+        prefix = candidate.get("context_prefix")
+        retrieval_text = (
+            f"{prefix}\n\n{candidate['content']}" if prefix else candidate["content"]
+        )
+        pairs.append((query, retrieval_text))
     scores = _model.predict(pairs, show_progress_bar=False)
 
     scored = [dict(c, rerank_score=float(s)) for c, s in zip(candidates, scores)]

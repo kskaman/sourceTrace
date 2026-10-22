@@ -111,6 +111,14 @@ def test_hybrid_raises_when_both_searches_fail(monkeypatch):
         hybrid.hybrid_candidates("q")
 
 
+def test_hybrid_rejects_unsupported_filter_columns():
+    with pytest.raises(ValueError, match="Unsupported retrieval filter columns"):
+        hybrid.keyword_search(
+            "q",
+            filters={"data_folder; DROP TABLE chunks": "policies"},
+        )
+
+
 def test_query_rewrite_failure_falls_back_to_the_original_question(monkeypatch):
     module = types.ModuleType("src.retrieve.query_transform")
 

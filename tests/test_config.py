@@ -16,6 +16,9 @@ VALID_ENV = {
     "CONTEXT_N": "10",
     "USE_RERANKER": "true",
     "USE_QUERY_TRANSFORM": "no",
+    "USE_CONTEXTUAL_RETRIEVAL": "true",
+    "CONTEXTUAL_MODEL": "llama3.2:3b",
+    "CONTEXTUAL_MAX_DOCUMENT_CHARS": "12000",
     "CHUNK_SIZE": "512",
     "CHUNK_OVERLAP": "50",
     "EMBED_BATCH_SIZE": "64",
@@ -35,6 +38,9 @@ def test_build_config_parses_every_value():
     assert cfg["embed_max_retries"] == 0
     assert cfg["use_reranker"] is True
     assert cfg["use_query_transform"] is False
+    assert cfg["use_contextual_retrieval"] is True
+    assert cfg["contextual_model"] == "llama3.2:3b"
+    assert cfg["contextual_max_document_chars"] == 12000
     assert cfg["print_trace"] is True
     assert cfg["force_semantic_failure"] is False
     assert cfg["trace_dir"] == ""
@@ -59,6 +65,8 @@ def test_every_variable_is_required(name):
         ("EMBEDDING_DIM", "0"),
         ("CANDIDATE_K", "ten"),
         ("CONTEXT_N", "-1"),
+        ("CONTEXTUAL_MAX_DOCUMENT_CHARS", "0"),
+        ("USE_CONTEXTUAL_RETRIEVAL", "sometimes"),
         ("CHUNK_OVERLAP", "-5"),
         ("EMBED_MAX_RETRIES", "1.5"),
         ("USE_RERANKER", "maybe"),
