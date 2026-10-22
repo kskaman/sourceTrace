@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [baseline]
+    branches: [contextual-retrieval]
   pull_request:
-    branches: [baseline]
+    branches: [contextual-retrieval]
 
 permissions:
   contents: read
