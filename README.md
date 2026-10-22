@@ -1,105 +1,21 @@
 # sourceTrace
 
-sourceTrace is a local Retrieval-Augmented Generation (RAG) CLI. It parses documents, cleans and chunks their text, creates embeddings, stores them in PostgreSQL with pgvector, retrieves relevant context, and generates answers with Ollama.
+sourceTrace contains Retrieval-Augmented Generation (RAG) pipelines written in Python. The pipelines use PostgreSQL with pgvector, Sentence Transformers, and Ollama for document ingestion, embeddings, hybrid retrieval, reranking, and answer generation with citations.
 
-## Requirements
+The implementation is organized into separate branches. The `main` branch contains the overview, while each branch below contains a runnable version of the pipeline.
 
-- Python 3.10 or newer
-- Docker Desktop with Docker Compose
-- Ollama
+## Branches
 
-## Setup
+### [`baseline`](https://github.com/kskaman/sourceTrace/tree/baseline)
 
-Create and activate a virtual environment, then install the dependencies:
+The standard RAG pipeline. Documents are parsed, cleaned, split into chunks, embedded, and stored in pgvector. Retrieval combines keyword and semantic search, followed by reranking and answer generation.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+### [`parent-document-retrieval`](https://github.com/kskaman/sourceTrace/tree/parent-document-retrieval)
 
-Copy the environment template and update its values. In particular, set `DATABASE_URL` to the password used by your PostgreSQL instance.
+Extends the baseline pipeline with parent-document retrieval. Search ranks small child chunks, then expands selected results with neighboring chunks from the same document. Overlapping ranges are merged and duplicate chunks are removed.
 
-```powershell
-Copy-Item .env.example .env
-```
+### [`contextual-retrieval`](https://github.com/kskaman/sourceTrace/tree/contextual-retrieval)
 
-Start the application database:
+Extends the baseline pipeline with contextual retrieval. Ollama generates a document-aware context prefix for each chunk during ingestion. The prefix is used for embeddings, keyword search, and reranking, while the original chunk text is retained for answers and citations.
 
-```powershell
-docker compose up -d pgvector
-```
-
-Start Ollama and ensure the configured model is installed:
-
-```powershell
-ollama serve
-ollama pull llama3.2:3b
-```
-
-The defaults use `http://localhost:11434` for Ollama. All application settings in `.env` are validated at startup. `TRACE_DIR` must be defined but may be empty to disable trace files.
-
-## Ingestion
-
-```powershell
-python rag_cli.py ingest <path> --folder <name>
-```
-
-Supported document types are Markdown, HTML, DOCX, PDF, and plain text. Ingestion performs these stages:
-
-1. Parse document text and metadata.
-2. Normalize text and remove common boilerplate.
-3. Split text into chunks no larger than `CHUNK_SIZE`.
-4. Create one embedding per chunk and validate its configured dimension.
-5. Store chunks, embeddings, and metadata in PostgreSQL.
-
-The database schema is created automatically on first ingestion. Reingestion is idempotent: unchanged files are skipped, while changed files are replaced atomically. New chunks are stored and old chunks are removed in one transaction; if replacement fails, the previous indexed document remains available.
-
-Data folders are logical namespaces in PostgreSQL. Source files are not copied or renamed, and the reserved folder name `default` is rejected.
-
-## Usage
-
-```powershell
-python rag_cli.py ingest tests/data/corpus --folder policies
-python rag_cli.py ingest tests/data/corpus/refund_policy.md --folder finance
-python rag_cli.py chat --folder policies
-python rag_cli.py chat --folder policies --results 5
-python rag_cli.py list-folders
-python rag_cli.py rename-folder --folder policies --new-name handbook
-python rag_cli.py delete-folder --folder policies
-```
-
-Chat requires an existing folder containing indexed data. Missing or empty folders fail with a clear error instead of starting an unusable chat session.
-
-`list-folders` shows each folder with its document and chunk counts. `rename-folder` refuses to merge into an existing folder. `delete-folder` asks for the exact folder name before deleting data; use `--yes` only when confirmation is intentionally unnecessary:
-
-```powershell
-python rag_cli.py delete-folder --folder policies --yes
-```
-
-## Testing
-
-Tests use a dedicated `sourceTraceTest` PostgreSQL database on host port `5433`. They do not use or clear the application database on port `5432`.
-
-```powershell
-docker compose up -d pgvector-test
-python -m pytest -q
-```
-
-The test URL defaults to:
-
-```text
-postgresql://rag-cli:rag-cli@localhost:5433/sourceTraceTest
-```
-
-Set `TEST_DATABASE_URL` only when another isolated test database is required. It must not point to the application database because database tests clear their own `chunks` table between cases.
-
-Parser and ingestion tests use four small synthetic fixtures in `tests/data/corpus/`: one Markdown, HTML, DOCX, and PDF document.
-
-## Observability
-
-- `PRINT_TRACE=true` prints per-request stage and latency summaries.
-- Set `TRACE_DIR` to a directory to write JSON traces.
-- Leave `TRACE_DIR=` empty to disable trace files.
-
-Database credentials are excluded from configuration snapshots and trace output.
+The parent-document and contextual-retrieval branches are separate variants built from `baseline`; they do not include each other's retrieval pattern.
