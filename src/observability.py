@@ -10,6 +10,7 @@ from pathlib import Path
 
 _trace_id: ContextVar[str | None] = ContextVar("_trace_id", default=None)
 _events: ContextVar[list | None] = ContextVar("_events", default=None)
+_span_stack: ContextVar[tuple] = ContextVar("_span_stack", default=())
 
 
 def new_trace() -> str:
@@ -17,6 +18,7 @@ def new_trace() -> str:
     trace_id = uuid.uuid4().hex[:12]
     _trace_id.set(trace_id)
     _events.set([])
+    _span_stack.set(())
     return trace_id
 
 
@@ -29,6 +31,8 @@ def log_event(stage: str, **fields) -> None:
     events = _events.get()
     if events is None:
         return
+    stack = _span_stack.get()
+    fields.setdefault("parent_id", stack[-1] if stack else None)
     events.append({
         "trace_id": _trace_id.get(),
         "stage": stage,
@@ -39,7 +43,11 @@ def log_event(stage: str, **fields) -> None:
 
 @contextlib.contextmanager
 def span(stage: str, **fields):
-    """Time a block and emit a single structured event at its end."""
+    """Time a block and emit one structured event at its end, linked to its parent span."""
+    stack = _span_stack.get()
+    parent_id = stack[-1] if stack else None
+    span_id = uuid.uuid4().hex[:8]
+    token = _span_stack.set(stack + (span_id,))
     start = time.perf_counter()
     err = None
     try:
@@ -49,7 +57,8 @@ def span(stage: str, **fields):
         raise
     finally:
         elapsed_ms = (time.perf_counter() - start) * 1000
-        extra = {"latency_ms": round(elapsed_ms, 1)}
+        _span_stack.reset(token)
+        extra = {"latency_ms": round(elapsed_ms, 1), "span_id": span_id, "parent_id": parent_id}
         if err is not None:
             extra["error"] = err
         log_event(stage, **fields, **extra)
@@ -83,15 +92,35 @@ def write_trace(directory: str, label: str = "") -> Path | None:
 
 
 def trace_summary() -> dict:
-    """Aggregate the per-stage latencies into a flat summary."""
+    """Aggregate per-stage latencies and token usage into a flat summary.
+
+    Repeated stages report `count` and summed latency. The total only counts
+    top-level spans so nested spans are not double-counted.
+    """
     summary: dict = {"trace_id": _trace_id.get(), "stages": {}}
     total_ms = 0.0
+    prompt_tokens = 0
+    completion_tokens = 0
     for event in trace_events():
         stage = event["stage"]
-        summary["stages"][stage] = {
+        fields = {
             k: v for k, v in event.items()
-            if k not in ("trace_id", "stage", "ts")
+            if k not in ("trace_id", "stage", "ts", "span_id", "parent_id")
         }
-        total_ms += event.get("latency_ms", 0)
+        previous = summary["stages"].get(stage)
+        if previous is not None:
+            fields["count"] = previous.get("count", 1) + 1
+            if "latency_ms" in fields:
+                fields["latency_ms"] = round(
+                    fields["latency_ms"] + previous.get("latency_ms", 0), 1
+                )
+        summary["stages"][stage] = fields
+        if event.get("parent_id") is None:
+            total_ms += event.get("latency_ms", 0)
+        prompt_tokens += event.get("prompt_tokens") or 0
+        completion_tokens += event.get("completion_tokens") or 0
     summary["total_latency_ms"] = round(total_ms, 1)
+    if prompt_tokens or completion_tokens:
+        summary["prompt_tokens"] = prompt_tokens
+        summary["completion_tokens"] = completion_tokens
     return summary

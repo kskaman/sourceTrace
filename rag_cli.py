@@ -166,9 +166,9 @@ def chat_loop(data_folder: str, max_results: int | None = None, answer_fn=None):
             break
 
         if answer_fn is None:
-            from src.retrieve import answer
+            from src.retrieve import agent_answer, answer
 
-            answer_fn = answer
+            answer_fn = agent_answer if CONFIG["use_agent"] else answer
 
         try:
             response = answer_fn(
@@ -186,6 +186,11 @@ def chat_loop(data_folder: str, max_results: int | None = None, answer_fn=None):
             report_trace()
             continue
         print(f"Assistant: {response['answer']}")
+        if "steps" in response:
+            print(
+                f"\nAgent: {response['steps']} steps, "
+                f"{response['search_calls']} searches ({response['stop_reason']})"
+            )
         print(f"\nContext: {response['context']}\n")
         report_trace()
 

@@ -373,3 +373,39 @@ def test_chat_loop_prints_empty_index_message_and_uses_result_limit(
     captured = capsys.readouterr()
     assert "Assistant: No indexed references found." in captured.out
     assert "Context: []" in captured.out
+
+
+@pytest.mark.parametrize("use_agent, expected", [(True, "agent"), (False, "standard")])
+def test_chat_loop_routes_to_agent_or_standard_pipeline(
+    monkeypatch, capsys, use_agent, expected
+):
+    from src.config import CONFIG
+    from src import retrieve
+
+    inputs = iter(["Q?", "exit"])
+    used = []
+
+    def make(name):
+        def fn(**kwargs):
+            used.append(name)
+            return {
+                "answer": "ok",
+                "context": [],
+                "candidate_count": 0,
+                "steps": 2,
+                "search_calls": 1,
+                "stop_reason": "answered",
+            }
+
+        return fn
+
+    monkeypatch.setitem(CONFIG, "use_agent", use_agent)
+    monkeypatch.setattr(retrieve, "agent_answer", make("agent"))
+    monkeypatch.setattr(retrieve, "answer", make("standard"))
+    monkeypatch.setattr(rag_cli, "require_data_folder", lambda _: None)
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    rag_cli.chat_loop("policies")
+
+    assert used == [expected]
+    assert "Agent: 2 steps, 1 searches (answered)" in capsys.readouterr().out

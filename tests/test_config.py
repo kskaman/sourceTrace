@@ -16,6 +16,10 @@ VALID_ENV = {
     "CONTEXT_N": "10",
     "USE_RERANKER": "true",
     "USE_QUERY_TRANSFORM": "no",
+    "USE_AGENT": "yes",
+    "AGENT_MAX_STEPS": "6",
+    "AGENT_MAX_SEARCH_CALLS": "4",
+    "MIN_RERANK_SCORE": "0.05",
     "CHUNK_SIZE": "512",
     "CHUNK_OVERLAP": "50",
     "EMBED_BATCH_SIZE": "64",
@@ -35,6 +39,10 @@ def test_build_config_parses_every_value():
     assert cfg["embed_max_retries"] == 0
     assert cfg["use_reranker"] is True
     assert cfg["use_query_transform"] is False
+    assert cfg["use_agent"] is True
+    assert cfg["agent_max_steps"] == 6
+    assert cfg["agent_max_search_calls"] == 4
+    assert cfg["min_rerank_score"] == 0.05
     assert cfg["print_trace"] is True
     assert cfg["force_semantic_failure"] is False
     assert cfg["trace_dir"] == ""
@@ -62,6 +70,11 @@ def test_every_variable_is_required(name):
         ("CHUNK_OVERLAP", "-5"),
         ("EMBED_MAX_RETRIES", "1.5"),
         ("USE_RERANKER", "maybe"),
+        ("USE_AGENT", "sometimes"),
+        ("AGENT_MAX_STEPS", "0"),
+        ("AGENT_MAX_SEARCH_CALLS", "-2"),
+        ("MIN_RERANK_SCORE", "1.5"),
+        ("MIN_RERANK_SCORE", "low"),
         ("PRINT_TRACE", ""),
         ("OLLAMA_MODEL", "   "),
     ],

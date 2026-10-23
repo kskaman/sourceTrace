@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [baseline]
+    branches: [agentic-rag]
   pull_request:
-    branches: [baseline]
+    branches: [agentic-rag]
 
 permissions:
   contents: read

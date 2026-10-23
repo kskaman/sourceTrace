@@ -71,6 +71,19 @@ python rag_cli.py delete-folder --folder policies
 
 Chat requires an existing folder containing indexed data. Missing or empty folders fail with a clear error instead of starting an unusable chat session.
 
+### Agentic RAG
+
+With `USE_AGENT=true` (the default in `.env.example`), `chat` runs a bounded tool-calling loop (`src/retrieve/agent.py`) instead of a single retrieve-then-generate pass. The LLM decides whether to call the `search` tool, with what query, and how many times; each search is hybrid retrieval scoped to the chosen folder followed by reranking. The model needs tool-calling support in Ollama (for example `llama3.2:3b`).
+
+- `AGENT_MAX_STEPS` caps LLM turns; the tool is withheld on the last turn so the model must answer.
+- `AGENT_MAX_SEARCH_CALLS` caps searches; excess calls are refused and repeated queries reuse earlier results.
+- `--results` is the maximum chunks a single search returns.
+- `MIN_RERANK_SCORE` (0-1, default 0.05; 0 disables) drops chunks the reranker scores as irrelevant, so out-of-scope questions get no evidence. If a search finds nothing relevant and the question is compound, it is retried as separate sub-questions.
+- If the model answers without searching, the question is searched for it. If no relevant evidence is found, the answer is always `I don't know.` rather than the model's own knowledge.
+- If the answer lacks valid chunk citations, the model gets one tool-free turn to add them.
+- If the agent loop fails (for example the model has no tool support), the request degrades to the standard pipeline.
+- `USE_AGENT=false` always uses the standard single-pass pipeline.
+
 `list-folders` shows each folder with its document and chunk counts. `rename-folder` refuses to merge into an existing folder. `delete-folder` asks for the exact folder name before deleting data; use `--yes` only when confirmation is intentionally unnecessary:
 
 ```powershell
@@ -101,5 +114,8 @@ Parser and ingestion tests use four small synthetic fixtures in `tests/data/corp
 - `PRINT_TRACE=true` prints per-request stage and latency summaries.
 - Set `TRACE_DIR` to a directory to write JSON traces.
 - Leave `TRACE_DIR=` empty to disable trace files.
+- Every event carries `span_id` and `parent_id`, so nested stages (for example retrieval inside an agent search) can be reconstructed as a tree.
+- Agent traces include `agent.llm` (latency per step), `agent.llm.result` (tool-call count, prompt/completion tokens), `agent.tool.search`/`agent.tool.result` (query, returned markers), `agent.tool.refused`/`repeat`/`error`, `agent.citations` (cited markers that were never retrieved, or missing citations), `agent.citations.repair`, `agent.forced_search`, `agent.answer_blocked`, `selection.relevance_filter`, `agent.search.decomposed`, `agent.degraded`, and `agent.final` (steps, searches, stop reason).
+- The trace summary aggregates repeated stages (`count`, summed latency), reports `total_latency_ms` from top-level spans only, and totals tokens.
 
 Database credentials are excluded from configuration snapshots and trace output.

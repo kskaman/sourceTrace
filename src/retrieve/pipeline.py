@@ -135,6 +135,7 @@ def answer(
     new_trace()
     log_event(
         "request.start",
+        mode="standard",
         question_chars=len(question),
         data_folder=data_folder,
         k=k,
@@ -144,7 +145,13 @@ def answer(
         reranker_model=CONFIG["reranker_model"],
         llm_model=LLM_MODEL,
     )
+    return answer_within_trace(question, data_folder, k, n, use_reranker)
 
+
+def answer_within_trace(
+    question: str, data_folder: str, k: int, n: int, use_reranker: bool
+) -> dict:
+    """Run the single-pass pipeline inside the caller's trace (no new trace is started)."""
     retrieval_query = _retrieval_query(question)
     with span("retrieval.hybrid", k=k):
         candidates = hybrid_candidates(

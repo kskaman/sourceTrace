@@ -38,6 +38,13 @@ def _non_negative_int(raw: str) -> int:
     return value
 
 
+def _unit_float(raw: str) -> float:
+    value = float(raw)
+    if not 0 <= value <= 1:
+        raise ValueError(raw)
+    return value
+
+
 def _bool(raw: str) -> bool:
     lowered = raw.lower()
     if lowered in _TRUE:
@@ -64,6 +71,7 @@ _EXPECT_TEXT = "a non-empty string"
 _EXPECT_POSITIVE_INT = "a positive integer"
 _EXPECT_NON_NEGATIVE_INT = "a non-negative integer"
 _EXPECT_BOOL = "one of true/false, yes/no, on/off, 1/0"
+_EXPECT_UNIT_FLOAT = "a number between 0 and 1"
 
 
 def get_or_throw(
@@ -116,6 +124,12 @@ def build_config(env: Mapping[str, str] | None = None) -> dict:
         "embed_max_retries": get("EMBED_MAX_RETRIES", _non_negative_int, _EXPECT_NON_NEGATIVE_INT),
         "use_reranker": get("USE_RERANKER", _bool, _EXPECT_BOOL),
         "use_query_transform": get("USE_QUERY_TRANSFORM", _bool, _EXPECT_BOOL),
+        "use_agent": get("USE_AGENT", _bool, _EXPECT_BOOL),
+        "min_rerank_score": get("MIN_RERANK_SCORE", _unit_float, _EXPECT_UNIT_FLOAT),
+        "agent_max_steps": get("AGENT_MAX_STEPS", _positive_int, _EXPECT_POSITIVE_INT),
+        "agent_max_search_calls": get(
+            "AGENT_MAX_SEARCH_CALLS", _positive_int, _EXPECT_POSITIVE_INT
+        ),
         "print_trace": get("PRINT_TRACE", _bool, _EXPECT_BOOL),
         "trace_dir": get("TRACE_DIR", expected="a directory path (may be empty)", allow_empty=True),
         "force_reranker_failure": get("FORCE_RERANKER_FAILURE", _bool, _EXPECT_BOOL),
