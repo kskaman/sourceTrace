@@ -18,4 +18,8 @@ Extends the baseline pipeline with parent-document retrieval. Search ranks small
 
 Extends the baseline pipeline with contextual retrieval. Ollama generates a document-aware context prefix for each chunk during ingestion. The prefix is used for embeddings, keyword search, and reranking, while the original chunk text is retained for answers and citations.
 
-The parent-document and contextual-retrieval branches are separate variants built from `baseline`; they do not include each other's retrieval pattern.
+### [`agentic-rag`](https://github.com/kskaman/sourceTrace/tree/agentic-rag)
+
+Extends the baseline pipeline with an agent loop. Instead of one retrieve-then-generate pass, the LLM calls a `search` tool as many times as it needs, within step and search-call limits. Answers are grounded in the retrieved chunks: irrelevant chunks are filtered out, answers with no evidence become "I don't know.", and missing citations are repaired. Traces record every step, search, token count, and fallback, and `USE_AGENT=false` switches back to the standard pipeline.
+
+The parent-document, contextual-retrieval, and agentic-rag branches are separate variants built from `baseline`; they do not include each other's pattern.
